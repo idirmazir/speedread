@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { createClient } from '../../lib/supabase-client'
 import { useThemeSettings, ThemeSettingsPanel } from '../components/theme-settings'
 
@@ -282,32 +282,6 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showReader, togglePlay, words.length, showThemePanel])
 
-  // Render word with ORP highlight — now uses theme colors + font
-  const renderWord = (word) => {
-    if (!word) return null
-    const orp = calculateORP(word)
-    const before = word.slice(0, orp)
-    const focal = word[orp] || ''
-    const after = word.slice(orp + 1)
-    
-    return (
-      <div className={`flex items-center justify-center ${fontSizeClasses[fontSize]} select-none`} 
-           style={{ 
-             fontFamily: font.family,
-             fontWeight: font.weight,
-             letterSpacing: font.letterSpacing,
-           }}>
-        <span style={{ color: theme.textMuted, textAlign: 'right' }}>{before}</span>
-        <span className="mx-1 relative" style={{ color: focalColor, fontWeight: 500 }}>
-          {focal}
-          <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-0.5 rounded-full opacity-60"
-               style={{ backgroundColor: focalColor }}></div>
-        </span>
-        <span style={{ color: theme.textMuted, textAlign: 'left' }}>{after}</span>
-      </div>
-    )
-  }
-
   // ─── Dynamic slider CSS (adapts to theme) ───
   const sliderCSS = `
     .slider-themed::-webkit-slider-thumb {
@@ -500,9 +474,15 @@ export default function Home() {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-px h-32"
                style={{ background: `linear-gradient(to bottom, transparent, ${theme.border}, transparent)`, opacity: 0.3 }}></div>
           
-          <div className="relative z-10 px-8 py-12 rounded-2xl backdrop-blur-sm shadow-2xl"
-               style={{ backgroundColor: `${theme.surface}33`, border: `1px solid ${theme.border}44` }}>
-            {renderWord(words[currentIndex])}
+          <div className="relative z-10">
+            <RSVPWord 
+              word={words[currentIndex]} 
+              calculateORP={calculateORP}
+              fontSize={fontSizeClasses[fontSize]}
+              font={font}
+              theme={theme}
+              focalColor={focalColor}
+            />
           </div>
         </div>
         
@@ -924,5 +904,49 @@ export default function Home() {
       
       <style jsx>{sliderCSS}</style>
     </main>
+  )
+}
+
+// Pixel-perfect RSVP word display — measures actual focal letter position and corrects before paint
+function RSVPWord({ word, calculateORP, fontSize, font, theme, focalColor }) {
+  const containerRef = useRef(null)
+  const focalRef = useRef(null)
+  const wordRef = useRef(null)
+
+  // useLayoutEffect fires before browser paint — no flicker
+  useLayoutEffect(() => {
+    if (!containerRef.current || !focalRef.current || !wordRef.current || !word) return
+    // Reset transform so we measure from natural position
+    wordRef.current.style.transform = 'translateX(0px)'
+    // Now measure
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const focalRect = focalRef.current.getBoundingClientRect()
+    const containerCenter = containerRect.left + containerRect.width / 2
+    const focalCenter = focalRect.left + focalRect.width / 2
+    const correction = containerCenter - focalCenter
+    // Apply correction before browser paints
+    wordRef.current.style.transform = `translateX(${correction}px)`
+  }, [word])
+
+  if (!word) return null
+  const orp = calculateORP(word)
+  const before = word.slice(0, orp)
+  const focal = word[orp] || ''
+  const after = word.slice(orp + 1)
+
+  return (
+    <div ref={containerRef}
+         className={`flex items-center justify-center ${fontSize} select-none`}
+         style={{ fontFamily: font.family, fontWeight: font.weight, letterSpacing: font.letterSpacing }}>
+      <div ref={wordRef} className="whitespace-nowrap">
+        <span style={{ color: theme.textMuted }}>{before}</span>
+        <span ref={focalRef} style={{ color: focalColor, fontWeight: 500, position: 'relative', display: 'inline-block' }}>
+          {focal}
+          <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-0.5 rounded-full opacity-60"
+                style={{ backgroundColor: focalColor }}></span>
+        </span>
+        <span style={{ color: theme.textMuted }}>{after}</span>
+      </div>
+    </div>
   )
 }

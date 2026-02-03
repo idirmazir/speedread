@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 
 // ═══════════════════════════════════════════════════════
 // THEME DEFINITIONS
@@ -419,6 +419,9 @@ function RSVPPreview({ settings }) {
 
   const words = ['Constitutional', 'law', 'requires', 'careful', 'analysis']
   const [idx, setIdx] = useState(0)
+  const containerRef = useRef(null)
+  const focalRef = useRef(null)
+  const wordRef = useRef(null)
 
   useEffect(() => {
     const interval = setInterval(() => setIdx(prev => (prev + 1) % words.length), 500)
@@ -431,15 +434,26 @@ function RSVPPreview({ settings }) {
   const focal = word[orp]
   const after = word.slice(orp + 1)
 
+  useLayoutEffect(() => {
+    if (!containerRef.current || !focalRef.current || !wordRef.current) return
+    wordRef.current.style.transform = 'translateX(0px)'
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const focalRect = focalRef.current.getBoundingClientRect()
+    const containerCenter = containerRect.left + containerRect.width / 2
+    const focalCenter = focalRect.left + focalRect.width / 2
+    wordRef.current.style.transform = `translateX(${containerCenter - focalCenter}px)`
+  }, [idx])
+
   return (
-    <div style={{
+    <div ref={containerRef} style={{
       backgroundColor: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 14,
-      padding: '32px 20px', textAlign: 'center',
+      padding: '32px 20px',
       fontFamily: font.family, fontWeight: font.weight, letterSpacing: font.letterSpacing,
+      overflow: 'hidden',
     }}>
-      <div style={{ fontSize: 32, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+      <div ref={wordRef} style={{ fontSize: 32, lineHeight: 1.2, whiteSpace: 'nowrap', textAlign: 'center' }}>
         <span style={{ color: theme.textMuted }}>{before}</span>
-        <span style={{ color: focalColor, fontWeight: 500, position: 'relative' }}>
+        <span ref={focalRef} style={{ display: 'inline-block', color: focalColor, fontWeight: 500, position: 'relative' }}>
           {focal}
           <span style={{
             position: 'absolute', bottom: -3, left: '50%', transform: 'translateX(-50%)',
