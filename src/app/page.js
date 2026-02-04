@@ -1,100 +1,48 @@
 'use client'
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
+// ─── RSVP Demo ─────────────────────────────────────────────
 function RSVPDemo() {
-  const words = "The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years.".split(' ')
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [wpm, setWpm] = useState(350)
-  const containerRef = useRef(null)
-  const focalRef = useRef(null)
-  const wordRef = useRef(null)
+  const text = "The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years."
+  const words = text.split(' ')
+  const [idx, setIdx] = useState(0)
+  const [speed, setSpeed] = useState(350)
 
-  const calculateORP = (word) => {
-    const len = word.length
-    if (len <= 1) return 0
-    if (len <= 3) return 1
-    if (len <= 5) return 1
-    if (len <= 7) return 2
-    if (len <= 9) return 2
-    if (len <= 11) return 3
-    if (len <= 13) return 3
-    return Math.floor(len * 0.3)
-  }
+  const orp = (w) => { const l = w.length; if (l <= 2) return 0; if (l <= 5) return 1; if (l <= 9) return 2; if (l <= 13) return 3; return Math.floor(l * 0.3) }
 
   useEffect(() => {
-    if (!isPlaying) return
-    const ms = (60 / wpm) * 1000
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => {
-        if (prev >= words.length - 1) return 0
-        return prev + 1
-      })
-    }, ms)
-    return () => clearInterval(interval)
-  }, [isPlaying, wpm, words.length])
+    const iv = setInterval(() => setIdx(p => p >= words.length - 1 ? 0 : p + 1), (60 / speed) * 1000)
+    return () => clearInterval(iv)
+  }, [speed, words.length])
 
-  const word = words[currentIndex]
-  const orp = calculateORP(word)
-  const before = word.slice(0, orp)
-  const focal = word[orp] || ''
-  const after = word.slice(orp + 1)
-
-  useLayoutEffect(() => {
-    if (!containerRef.current || !focalRef.current || !wordRef.current) return
-    wordRef.current.style.transform = 'translateX(0px)'
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const focalRect = focalRef.current.getBoundingClientRect()
-    const containerCenter = containerRect.left + containerRect.width / 2
-    const focalCenter = focalRect.left + focalRect.width / 2
-    wordRef.current.style.transform = `translateX(${containerCenter - focalCenter}px)`
-  }, [currentIndex])
+  const w = words[idx], o = orp(w), bef = w.slice(0, o), foc = w[o] || '', aft = w.slice(o + 1)
 
   return (
     <div className="relative">
-      <div className="bg-slate-950/80 backdrop-blur-xl border border-slate-700/40 rounded-2xl overflow-hidden shadow-2xl shadow-emerald-900/20">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-            <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
-          </div>
-          <div className="text-emerald-400 text-sm font-medium tracking-wide">{wpm} WPM</div>
+      <div className="absolute -inset-3 bg-emerald-500/[0.03] rounded-3xl blur-2xl" />
+      <div className="relative rounded-2xl overflow-hidden" style={{ backgroundColor: '#0a0a0a', border: '1px solid #262626' }}>
+        {/* Window bar */}
+        <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid #1a1a1a' }}>
+          <div className="flex gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" /><div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" /><div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" /></div>
+          <div className="text-emerald-400 text-[11px] font-semibold tabular-nums tracking-wide">{speed} WPM</div>
         </div>
-
-        <div ref={containerRef} className="flex items-center justify-center py-16 px-8 relative">
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-px h-24 bg-gradient-to-b from-transparent via-slate-700/30 to-transparent"></div>
-          <div
-            ref={wordRef}
-            className="relative z-10 text-4xl md:text-5xl font-light tracking-tight whitespace-nowrap"
-            style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}
-          >
-            <span className="text-slate-400">{before}</span>
-            <span ref={focalRef} className="text-emerald-400 font-medium relative inline-block">
-              {focal}
-              <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-0.5 bg-emerald-400 rounded-full opacity-60"></div>
-            </span>
-            <span className="text-slate-400">{after}</span>
+        {/* Word display */}
+        <div className="flex items-center justify-center py-14 px-8 relative">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-20" style={{ background: 'linear-gradient(transparent, rgba(255,255,255,0.06), transparent)' }} />
+          <div className="text-4xl md:text-5xl font-light tracking-tight select-none" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+            <span className="text-[#737373]" style={{ textAlign: 'right' }}>{bef}</span>
+            <span className="text-emerald-400 font-semibold relative text-center px-[1px]">{foc}<div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-0.5 bg-emerald-400 rounded-full opacity-40" /></span>
+            <span className="text-[#737373]" style={{ textAlign: 'left' }}>{aft}</span>
           </div>
         </div>
-
-        <div className="h-1 bg-slate-800/50 mx-4 mb-4 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-200"
-            style={{ width: `${((currentIndex + 1) / words.length) * 100}%` }}
-          />
-        </div>
-
-        <div className="flex items-center justify-center gap-3 pb-5">
-          {[250, 350, 500, 700].map(speed => (
-            <button
-              key={speed}
-              onClick={() => setWpm(speed)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${wpm === speed ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-500 hover:text-slate-300'}`}
-            >
-              {speed}
-            </button>
+        {/* Progress */}
+        <div className="h-[2px] mx-4 mb-4" style={{ backgroundColor: '#1a1a1a' }}><div className="h-full bg-emerald-500/60 rounded-full transition-all duration-150" style={{ width: `${((idx + 1) / words.length) * 100}%` }} /></div>
+        {/* Speed buttons */}
+        <div className="flex items-center justify-center gap-2 pb-4">
+          {[250, 350, 500, 700].map(s => (
+            <button key={s} onClick={() => setSpeed(s)} className="px-3 py-1 rounded-full text-[11px] font-medium transition-all"
+              style={{ backgroundColor: speed === s ? 'rgba(52,211,153,0.12)' : 'transparent', color: speed === s ? '#34d399' : '#525252', border: speed === s ? '1px solid rgba(52,211,153,0.2)' : '1px solid transparent' }}>{s}</button>
           ))}
         </div>
       </div>
@@ -102,207 +50,134 @@ function RSVPDemo() {
   )
 }
 
-function AnimatedNumber({ target, suffix = '', duration = 2000 }) {
-  const [count, setCount] = useState(0)
-  const [hasAnimated, setHasAnimated] = useState(false)
+// ─── Animated Counter ──────────────────────────────────────
+function Counter({ target, suffix = '' }) {
+  const [n, setN] = useState(0)
+  const [go, setGo] = useState(false)
   const ref = useRef(null)
-
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated) {
-          setHasAnimated(true)
-          const startTime = Date.now()
-          const animate = () => {
-            const elapsed = Date.now() - startTime
-            const progress = Math.min(elapsed / duration, 1)
-            const eased = 1 - Math.pow(1 - progress, 3)
-            setCount(Math.floor(eased * target))
-            if (progress < 1) requestAnimationFrame(animate)
-          }
-          requestAnimationFrame(animate)
-        }
-      },
-      { threshold: 0.5 }
-    )
-    if (ref.current) observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [target, duration, hasAnimated])
-
-  return <span ref={ref}>{count}{suffix}</span>
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting && !go) { setGo(true); const s = Date.now(); const a = () => { const p = Math.min((Date.now() - s) / 1800, 1); setN(Math.floor((1 - Math.pow(1 - p, 3)) * target)); if (p < 1) requestAnimationFrame(a) }; requestAnimationFrame(a) } }, { threshold: 0.5 })
+    if (ref.current) obs.observe(ref.current)
+    return () => obs.disconnect()
+  }, [target, go])
+  return <span ref={ref}>{n}{suffix}</span>
 }
 
+// ═══════════════════════════════════════════════════════════
+// LANDING PAGE
+// ═══════════════════════════════════════════════════════════
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0)
+  useEffect(() => { const h = () => setScrollY(window.scrollY); window.addEventListener('scroll', h, { passive: true }); return () => window.removeEventListener('scroll', h) }, [])
 
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY)
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  const font = '"SF Pro Display", -apple-system, system-ui, sans-serif'
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 overflow-x-hidden">
+    <div className="min-h-screen text-[#e4e4e7] overflow-x-hidden" style={{ backgroundColor: '#09090b', fontFamily: font }}>
+      {/* Ambient */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-900/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-800/8 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] rounded-full blur-[200px]" style={{ backgroundColor: 'rgba(52,211,153,0.04)' }} />
+        <div className="absolute bottom-1/4 right-1/3 w-[400px] h-[400px] rounded-full blur-[150px]" style={{ backgroundColor: 'rgba(52,211,153,0.03)' }} />
       </div>
 
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 50 ? 'bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/50' : ''}`}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="text-2xl font-light" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-            Speed<span className="text-emerald-400 font-medium">Read</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <a href="#features" className="text-slate-400 hover:text-slate-200 text-sm font-light transition-colors hidden md:block">Features</a>
-            <a href="#how-it-works" className="text-slate-400 hover:text-slate-200 text-sm font-light transition-colors hidden md:block">How It Works</a>
-            <a href="#pricing" className="text-slate-400 hover:text-slate-200 text-sm font-light transition-colors hidden md:block">Pricing</a>
-            <a href="/app" className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-lg font-medium text-white text-sm shadow-lg hover:shadow-emerald-500/25 transition-all duration-200">
-              Start Reading Free
-            </a>
+      {/* ─── Nav ─────────────────────────────────────────── */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 40 ? 'backdrop-blur-xl' : ''}`} style={{ borderBottom: scrollY > 40 ? '1px solid #27272a' : '1px solid transparent', backgroundColor: scrollY > 40 ? 'rgba(9,9,11,0.85)' : 'transparent' }}>
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="text-[22px] tracking-tight"><span className="font-light">Speed</span><span className="text-emerald-400 font-semibold">Read</span></div>
+          <div className="flex items-center gap-5">
+            <a href="#features" className="text-[#71717a] hover:text-[#e4e4e7] text-[13px] transition-colors hidden md:block">Features</a>
+            <a href="#how" className="text-[#71717a] hover:text-[#e4e4e7] text-[13px] transition-colors hidden md:block">How It Works</a>
+            <a href="#pricing" className="text-[#71717a] hover:text-[#e4e4e7] text-[13px] transition-colors hidden md:block">Pricing</a>
+            <a href="/app" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-lg font-semibold text-[13px] text-black shadow-lg transition-all hover:scale-[1.02]">Start Free</a>
           </div>
         </div>
       </nav>
 
-      <section className="relative pt-32 pb-20 md:pt-40 md:pb-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                <span className="text-emerald-400 text-xs font-medium tracking-wide uppercase">Backed by reading science</span>
+      {/* ─── Hero ────────────────────────────────────────── */}
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-14 items-center">
+            <div className="space-y-7">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                <span className="text-emerald-400 text-[10px] font-semibold tracking-[0.12em] uppercase">Backed by reading science</span>
               </div>
-
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-light leading-tight" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-                200 pages.
-                <br />
-                <span className="text-emerald-400 font-medium">1 hour.</span>
-                <br />
-                <span className="text-slate-500">Let's go.</span>
+              <h1 className="text-5xl md:text-6xl lg:text-[68px] font-light leading-[1.08] tracking-tight">
+                200 pages.<br />
+                <span className="text-emerald-400 font-semibold">1 hour.</span><br />
+                <span className="text-[#52525b]">Let's go.</span>
               </h1>
-
-              <p className="text-lg md:text-xl text-slate-400 font-light leading-relaxed max-w-lg">
-                SpeedRead uses RSVP technology to eliminate eye movement overhead, letting your brain process text at
-                <span className="text-slate-200 font-medium"> 2-3x your normal reading speed</span>. Upload your PDFs, DOCX files, or paste any text.
+              <p className="text-lg text-[#71717a] font-light leading-relaxed max-w-md">
+                RSVP technology eliminates eye movement overhead. Your brain processes text at <span className="text-[#e4e4e7] font-medium">2–3× normal speed</span>. Upload PDFs, DOCX files, or paste text.
               </p>
-
-              <div className="flex flex-col sm:flex-row items-start gap-4">
-                <a href="/app" className="group px-8 py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-xl font-medium text-white text-lg shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 transform hover:scale-105">
-                  Start Reading Free
-                  <span className="inline-block ml-2 group-hover:translate-x-1 transition-transform">→</span>
+              <div className="flex items-center gap-4">
+                <a href="/app" className="group px-7 py-3.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-semibold text-[15px] text-black shadow-xl hover:shadow-emerald-500/20 transition-all hover:scale-[1.02]">
+                  Start Reading Free <span className="inline-block ml-1 group-hover:translate-x-0.5 transition-transform">→</span>
                 </a>
-                <div className="text-slate-500 text-sm font-light pt-3">
-                  No credit card required
-                </div>
+                <span className="text-[#52525b] text-[12px]">No credit card</span>
               </div>
-
-              <div className="flex items-center gap-6 pt-4">
-                <div className="flex -space-x-2">
-                  {['bg-emerald-600', 'bg-teal-600', 'bg-cyan-600', 'bg-emerald-700'].map((bg, i) => (
-                    <div key={i} className={`w-8 h-8 rounded-full ${bg} border-2 border-slate-950 flex items-center justify-center text-xs font-medium text-white`}>
-                      {['S', 'M', 'L', 'K'][i]}
-                    </div>
+              <div className="flex items-center gap-4 pt-2">
+                <div className="flex -space-x-1.5">
+                  {['#10b981', '#059669', '#047857', '#065f46'].map((c, i) => (
+                    <div key={i} className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ backgroundColor: c, border: '2px solid #09090b' }}>{['S', 'M', 'L', 'K'][i]}</div>
                   ))}
                 </div>
-                <p className="text-slate-500 text-sm font-light">
-                  Used by students at <span className="text-slate-300">UWA</span>, <span className="text-slate-300">Perth</span>, <span className="text-slate-300">Western Australia</span>
-                </p>
+                <p className="text-[#52525b] text-[12px]">Used at <span className="text-[#a1a1aa]">UWA</span>, <span className="text-[#a1a1aa]">Perth</span>, <span className="text-[#a1a1aa]">Western Australia</span></p>
               </div>
             </div>
-
-            <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/5 to-transparent rounded-3xl blur-2xl"></div>
-              <RSVPDemo />
-            </div>
+            <RSVPDemo />
           </div>
         </div>
       </section>
 
-      <section className="border-y border-slate-800/50 bg-slate-900/20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { value: 3, suffix: 'x', label: 'Faster reading speed' },
-              { value: 900, suffix: '+', label: 'Words per minute possible' },
-              { value: 100, suffix: '%', label: 'Free to start' },
-              { value: 30, suffix: 's', label: 'To upload & start reading' },
-            ].map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="text-3xl md:text-4xl font-light text-emerald-400 mb-1" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-                  <AnimatedNumber target={stat.value} suffix={stat.suffix} />
-                </div>
-                <div className="text-slate-500 text-sm font-light">{stat.label}</div>
+      {/* ─── Stats ───────────────────────────────────────── */}
+      <section style={{ borderTop: '1px solid #27272a', borderBottom: '1px solid #27272a', backgroundColor: 'rgba(24,24,27,0.3)' }}>
+        <div className="max-w-5xl mx-auto px-6 py-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {[{ v: 3, s: '×', l: 'Faster reading' }, { v: 900, s: '+', l: 'WPM possible' }, { v: 100, s: '%', l: 'Free to start' }, { v: 30, s: 's', l: 'To start reading' }].map((s, i) => (
+              <div key={i}>
+                <div className="text-3xl font-light text-emerald-400 mb-0.5"><Counter target={s.v} suffix={s.s} /></div>
+                <div className="text-[11px] text-[#52525b]">{s.l}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-24 md:py-32">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-5xl font-light mb-6 leading-tight" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-            You have <span className="text-emerald-400 font-medium">3 chapters</span> due tomorrow.
-            <br />
-            <span className="text-slate-500">Sound familiar?</span>
+      {/* ─── Pain Point ──────────────────────────────────── */}
+      <section className="py-20 md:py-28">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="text-3xl md:text-[44px] font-light leading-tight tracking-tight mb-5">
+            You have <span className="text-emerald-400 font-semibold">3 chapters</span> due tomorrow.<br />
+            <span className="text-[#52525b]">Sound familiar?</span>
           </h2>
-          <p className="text-lg text-slate-400 font-light leading-relaxed max-w-2xl mx-auto">
-            The average university student spends 17 hours per week on assigned readings. Law students? Over 25. Your eyes waste time jumping between words, re-reading lines, losing focus. RSVP eliminates all of that by presenting words exactly where your brain expects them.
+          <p className="text-[15px] text-[#71717a] font-light leading-relaxed max-w-xl mx-auto">
+            The average student spends 17 hours per week on readings. Law students? Over 25. Your eyes waste time jumping between words, re-reading lines, losing focus. RSVP eliminates all of that.
           </p>
         </div>
       </section>
 
-      <section id="how-it-works" className="py-24 md:py-32 bg-slate-900/20">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-light mb-4" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-              Three steps to <span className="text-emerald-400 font-medium">faster reading</span>
-            </h2>
-            <p className="text-slate-400 font-light max-w-lg mx-auto">No training required. No learning curve. Just upload and read.</p>
+      {/* ─── How It Works ────────────────────────────────── */}
+      <section id="how" className="py-20 md:py-28" style={{ backgroundColor: 'rgba(24,24,27,0.2)' }}>
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-light tracking-tight mb-3">Three steps to <span className="text-emerald-400 font-semibold">faster reading</span></h2>
+            <p className="text-[14px] text-[#71717a] font-light">No training. No learning curve. Upload and read.</p>
           </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-4">
             {[
-              {
-                step: '01',
-                title: 'Upload your document',
-                description: 'Drop a PDF, DOCX, or TXT file. Or paste text directly. Your document is parsed and ready in seconds.',
-                icon: (
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                ),
-              },
-              {
-                step: '02',
-                title: 'Set your speed',
-                description: 'Start at 300 WPM and work up. Speed ramp gradually increases pace as you settle in. Adjust font size to your preference.',
-                icon: (
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                ),
-              },
-              {
-                step: '03',
-                title: 'Read & retain',
-                description: 'Words appear at the optimal recognition point. Your brain focuses on understanding, not scanning. Progress auto-saves.',
-                icon: (
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ),
-              },
+              { n: '01', title: 'Upload your document', desc: 'Drop a PDF, DOCX, or TXT file. Or paste text. Ready in seconds.', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /> },
+              { n: '02', title: 'Set your speed', desc: 'Start at 300 WPM and ramp up. Adjust font size and speed ramp to your preference.', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /> },
+              { n: '03', title: 'Read & retain', desc: 'Words appear at the optimal recognition point. Focus on understanding, not scanning.', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /> },
             ].map((item, i) => (
-              <div key={i} className="group relative bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 hover:border-emerald-500/20 rounded-2xl p-8 transition-all duration-300 hover:transform hover:scale-105">
-                <div className="absolute -top-4 -left-2 text-6xl font-light text-slate-800/50 select-none" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-                  {item.step}
-                </div>
+              <div key={i} className="group relative rounded-xl p-7 transition-all duration-300 hover:scale-[1.02]" style={{ backgroundColor: '#18181b', border: '1px solid #27272a' }}>
+                <div className="absolute -top-3 -left-1 text-[48px] font-light select-none" style={{ color: '#27272a' }}>{item.n}</div>
                 <div className="relative z-10">
-                  <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 mb-5 group-hover:bg-emerald-500/20 transition-colors">
-                    {item.icon}
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4" style={{ backgroundColor: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">{item.icon}</svg>
                   </div>
-                  <h3 className="text-xl font-medium text-slate-200 mb-3">{item.title}</h3>
-                  <p className="text-slate-400 font-light leading-relaxed">{item.description}</p>
+                  <h3 className="text-[15px] font-semibold text-[#e4e4e7] mb-2">{item.title}</h3>
+                  <p className="text-[13px] text-[#71717a] font-light leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             ))}
@@ -310,167 +185,127 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="features" className="py-24 md:py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-light mb-4" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-              Built for <span className="text-emerald-400 font-medium">serious students</span>
-            </h2>
-            <p className="text-slate-400 font-light max-w-lg mx-auto">Every feature designed around how students actually study.</p>
+      {/* ─── Features ────────────────────────────────────── */}
+      <section id="features" className="py-20 md:py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-light tracking-tight mb-3">Built for <span className="text-emerald-400 font-semibold">serious students</span></h2>
+            <p className="text-[14px] text-[#71717a] font-light">Every feature designed around how students actually study.</p>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
-              { title: 'Optimal Recognition Point', description: 'Each word is positioned so the key letter sits at your focal point. No eye movement, just pure comprehension.', icon: '◎' },
-              { title: 'PDF & DOCX Support', description: 'Upload lecture slides, journal articles, textbook chapters. Text is extracted automatically.', icon: '📄' },
-              { title: 'Speed Ramp', description: 'Start slow, gradually accelerate. Your brain adapts naturally without the jarring jump to high speeds.', icon: '⚡' },
-              { title: 'Document Library', description: 'Save documents to your cloud library. Resume reading exactly where you left off across any device.', icon: '📚' },
-              { title: 'Progress Tracking', description: 'Auto-saves your position every 10 seconds. See completion percentage and time remaining.', icon: '📊' },
-              { title: 'Keyboard Shortcuts', description: 'Space to play, arrows to navigate, R to restart. Full control without touching the mouse.', icon: '⌨️' },
-            ].map((feature, i) => (
-              <div key={i} className="group bg-slate-900/30 border border-slate-800/40 hover:border-emerald-500/20 rounded-xl p-6 transition-all duration-300">
-                <div className="text-2xl mb-4">{feature.icon}</div>
-                <h3 className="text-lg font-medium text-slate-200 mb-2">{feature.title}</h3>
-                <p className="text-slate-400 text-sm font-light leading-relaxed">{feature.description}</p>
+              { t: 'Optimal Recognition Point', d: 'Each word positioned so the key letter sits at your focal point. No eye movement needed.', i: '◎' },
+              { t: 'PDF & DOCX Support', d: 'Upload lecture slides, journal articles, textbook chapters. Extracted automatically.', i: '📄' },
+              { t: 'Speed Ramp', d: 'Start slow, gradually accelerate. Your brain adapts naturally.', i: '⚡' },
+              { t: 'Document Library', d: 'Save to your cloud library. Resume across any device.', i: '📚' },
+              { t: 'Progress Tracking', d: 'Auto-saves every 10 seconds. See completion and time remaining.', i: '📊' },
+              { t: 'Keyboard Shortcuts', d: 'Space to play, arrows to navigate, R to restart. Full keyboard control.', i: '⌨️' },
+            ].map((f, i) => (
+              <div key={i} className="rounded-xl p-5 transition-all duration-200 hover:scale-[1.01]" style={{ backgroundColor: 'rgba(24,24,27,0.4)', border: '1px solid #27272a' }}>
+                <div className="text-xl mb-3">{f.i}</div>
+                <h3 className="text-[14px] font-semibold text-[#e4e4e7] mb-1.5">{f.t}</h3>
+                <p className="text-[12px] text-[#71717a] font-light leading-relaxed">{f.d}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-24 md:py-32 bg-slate-900/20">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-light mb-4" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-              Perfect for <span className="text-emerald-400 font-medium">your field</span>
-            </h2>
+      {/* ─── Use Cases ───────────────────────────────────── */}
+      <section className="py-20 md:py-28" style={{ backgroundColor: 'rgba(24,24,27,0.2)' }}>
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-light tracking-tight mb-3">Perfect for <span className="text-emerald-400 font-semibold">your field</span></h2>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              { field: 'Law', description: 'Case briefs, legislation, journal articles. Cut through dense legal prose at 400+ WPM.', reading: '25+ hrs/week of reading', icon: '⚖️' },
-              { field: 'Medicine', description: 'Research papers, clinical guidelines, pharmacology texts. More time for practice, less for reading.', reading: '20+ hrs/week of reading', icon: '🩺' },
-              { field: 'Business', description: 'Case studies, market reports, financial analyses. Stay on top of the reading without falling behind.', reading: '15+ hrs/week of reading', icon: '📈' },
-              { field: 'Humanities', description: 'Literature reviews, critical theory, historical texts. Process more sources for better essays.', reading: '18+ hrs/week of reading', icon: '📖' },
-            ].map((item, i) => (
-              <div key={i} className="bg-slate-900/50 border border-slate-800/40 rounded-xl p-6 hover:border-emerald-500/20 transition-all duration-300">
-                <div className="text-3xl mb-3">{item.icon}</div>
-                <h3 className="text-lg font-medium text-slate-200 mb-1">{item.field}</h3>
-                <p className="text-emerald-400 text-xs font-medium mb-3">{item.reading}</p>
-                <p className="text-slate-400 text-sm font-light leading-relaxed">{item.description}</p>
+              { f: 'Law', d: 'Case briefs, legislation, journal articles. Cut through dense legal prose.', h: '25+ hrs/week', i: '⚖️' },
+              { f: 'Medicine', d: 'Research papers, clinical guidelines, pharmacology texts.', h: '20+ hrs/week', i: '🩺' },
+              { f: 'Business', d: 'Case studies, market reports, financial analyses.', h: '15+ hrs/week', i: '📈' },
+              { f: 'Humanities', d: 'Literature reviews, critical theory, historical texts.', h: '18+ hrs/week', i: '📖' },
+            ].map((x, i) => (
+              <div key={i} className="rounded-xl p-5 transition-all duration-200 hover:scale-[1.01]" style={{ backgroundColor: '#18181b', border: '1px solid #27272a' }}>
+                <div className="text-2xl mb-2.5">{x.i}</div>
+                <h3 className="text-[14px] font-semibold text-[#e4e4e7] mb-0.5">{x.f}</h3>
+                <p className="text-emerald-400 text-[10px] font-semibold mb-2">{x.h} reading</p>
+                <p className="text-[12px] text-[#71717a] font-light leading-relaxed">{x.d}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="pricing" className="py-24 md:py-32">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-light mb-4" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-              Start free. <span className="text-emerald-400 font-medium">Upgrade when ready.</span>
-            </h2>
-            <p className="text-slate-400 font-light">No tricks. No time limits. Free tier is genuinely useful.</p>
+      {/* ─── Pricing ─────────────────────────────────────── */}
+      <section id="pricing" className="py-20 md:py-28">
+        <div className="max-w-3xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-4xl font-light tracking-tight mb-3">Start free. <span className="text-emerald-400 font-semibold">Upgrade when ready.</span></h2>
+            <p className="text-[14px] text-[#71717a] font-light">No tricks. Free tier is genuinely useful.</p>
           </div>
-
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-8">
-              <div className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-2">Free</div>
-              <div className="text-4xl font-light text-slate-200 mb-1" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>$0</div>
-              <div className="text-slate-500 text-sm font-light mb-8">Forever</div>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'RSVP reader with all speed controls',
-                  'Paste text directly',
-                  'TXT file upload',
-                  'Up to 5,000 words per document',
-                  'Basic keyboard shortcuts',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm">
-                    <svg className="w-5 h-5 text-slate-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-slate-300 font-light">{item}</span>
-                  </li>
+          <div className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Free */}
+            <div className="rounded-xl p-7" style={{ backgroundColor: '#18181b', border: '1px solid #27272a' }}>
+              <div className="text-[10px] font-semibold tracking-[0.15em] uppercase text-[#52525b] mb-1.5">Free</div>
+              <div className="text-3xl font-light text-[#e4e4e7] mb-0.5">$0</div>
+              <div className="text-[11px] text-[#52525b] mb-6">Forever</div>
+              <div className="space-y-2.5 mb-6">
+                {['RSVP reader with all controls', 'Paste text directly', 'TXT file upload', 'Up to 5,000 words', 'Keyboard shortcuts'].map((x, i) => (
+                  <div key={i} className="flex items-start gap-2.5 text-[12px]">
+                    <svg className="w-4 h-4 text-[#52525b] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <span className="text-[#a1a1aa] font-light">{x}</span>
+                  </div>
                 ))}
-              </ul>
-              <a href="/app" className="block w-full py-3 text-center bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 rounded-xl text-sm font-medium text-slate-300 transition-all duration-200">
-                Get Started
-              </a>
+              </div>
+              <a href="/app" className="block w-full py-2.5 text-center rounded-lg text-[12px] font-semibold transition-all hover:opacity-80" style={{ backgroundColor: '#27272a', color: '#a1a1aa', border: '1px solid #3f3f46' }}>Get Started</a>
             </div>
-
-            <div className="relative bg-slate-900/50 border border-emerald-500/30 rounded-2xl p-8 shadow-lg shadow-emerald-900/10">
-              <div className="absolute -top-3 left-6 px-3 py-1 bg-gradient-to-r from-emerald-600 to-emerald-500 rounded-full text-xs font-medium text-white">
-                Most Popular
-              </div>
-              <div className="text-sm font-medium text-emerald-400 uppercase tracking-wider mb-2">Pro</div>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-light text-slate-200" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>$8</span>
-                <span className="text-slate-400 text-sm font-light">/month</span>
-              </div>
-              <div className="text-slate-500 text-sm font-light mb-8">or $60/year (save 37%)</div>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Everything in Free',
-                  'PDF & DOCX upload',
-                  'Unlimited document length',
-                  'Cloud document library',
-                  'Progress tracking & auto-save',
-                  'Reading analytics dashboard',
-                  'Offline mode',
-                  'Custom themes & fonts',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm">
-                    <svg className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-slate-300 font-light">{item}</span>
-                  </li>
+            {/* Pro */}
+            <div className="relative rounded-xl p-7 shadow-lg" style={{ backgroundColor: '#18181b', border: '1px solid rgba(52,211,153,0.25)', boxShadow: '0 0 40px rgba(52,211,153,0.05)' }}>
+              <div className="absolute -top-2.5 left-5 px-2.5 py-0.5 bg-emerald-500 rounded-full text-[10px] font-semibold text-black">Popular</div>
+              <div className="text-[10px] font-semibold tracking-[0.15em] uppercase text-emerald-400 mb-1.5">Pro</div>
+              <div className="flex items-baseline gap-0.5 mb-0.5"><span className="text-3xl font-light text-[#e4e4e7]">$8</span><span className="text-[12px] text-[#71717a]">/mo</span></div>
+              <div className="text-[11px] text-[#52525b] mb-6">or $60/year (save 37%)</div>
+              <div className="space-y-2.5 mb-6">
+                {['Everything in Free', 'PDF & DOCX upload', 'Unlimited documents', 'Cloud library', 'Progress & auto-save', 'Reading analytics', 'Custom themes & fonts', 'Offline mode'].map((x, i) => (
+                  <div key={i} className="flex items-start gap-2.5 text-[12px]">
+                    <svg className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <span className="text-[#e4e4e7] font-light">{x}</span>
+                  </div>
                 ))}
-              </ul>
-              <a href="/app" className="block w-full py-3 text-center bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-xl text-sm font-medium text-white shadow-lg hover:shadow-emerald-500/25 transition-all duration-200">
-                Start Free Trial
-              </a>
+              </div>
+              <a href="/app" className="block w-full py-2.5 text-center bg-emerald-500 hover:bg-emerald-400 rounded-lg text-[12px] font-semibold text-black shadow-lg transition-all hover:scale-[1.01]">Start Free Trial</a>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="py-24 md:py-32 relative">
-        <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/20 to-transparent pointer-events-none"></div>
-        <div className="max-w-3xl mx-auto px-6 text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-light mb-6 leading-tight" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-            Stop spending <span className="text-emerald-400 font-medium">4 hours</span> on readings.
-            <br />
-            Finish in <span className="text-emerald-400 font-medium">1</span>.
+      {/* ─── CTA ─────────────────────────────────────────── */}
+      <section className="py-20 md:py-28 relative">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(52,211,153,0.03), transparent)' }} />
+        <div className="max-w-2xl mx-auto px-6 text-center relative z-10">
+          <h2 className="text-4xl md:text-5xl font-light leading-tight tracking-tight mb-5">
+            Stop spending <span className="text-emerald-400 font-semibold">4 hours</span> on readings.<br />
+            Finish in <span className="text-emerald-400 font-semibold">1</span>.
           </h2>
-          <p className="text-lg text-slate-400 font-light mb-10 max-w-lg mx-auto">
-            Join thousands of students who read smarter, not slower. Free forever with no strings attached.
+          <p className="text-[15px] text-[#71717a] font-light mb-8 max-w-md mx-auto">
+            Join students who read smarter. Free forever, no strings attached.
           </p>
-          <a href="/app" className="inline-flex items-center gap-2 px-10 py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-xl font-medium text-white text-lg shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 transform hover:scale-105">
+          <a href="/app" className="inline-flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-semibold text-[15px] text-black shadow-xl hover:shadow-emerald-500/20 transition-all hover:scale-[1.02]">
             Start Speed Reading Now
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </a>
         </div>
       </section>
 
-      <footer className="border-t border-slate-800/50 py-12">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="text-xl font-light" style={{ fontFamily: '"SF Pro Display", system-ui, sans-serif' }}>
-              Speed<span className="text-emerald-400 font-medium">Read</span>
-            </div>
-            <div className="flex items-center gap-8 text-sm text-slate-500 font-light">
-              <a href="#features" className="hover:text-slate-300 transition-colors">Features</a>
-              <a href="#pricing" className="hover:text-slate-300 transition-colors">Pricing</a>
-              <a href="mailto:support@speedread.app" className="hover:text-slate-300 transition-colors">Contact</a>
-            </div>
-            <div className="text-sm text-slate-600 font-light">
-              © 2026 SpeedRead. All rights reserved.
-            </div>
+      {/* ─── Footer ──────────────────────────────────────── */}
+      <footer style={{ borderTop: '1px solid #27272a' }} className="py-10">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-[18px] tracking-tight"><span className="font-light">Speed</span><span className="text-emerald-400 font-semibold">Read</span></div>
+          <div className="flex items-center gap-6 text-[12px] text-[#52525b]">
+            <a href="#features" className="hover:text-[#a1a1aa] transition-colors">Features</a>
+            <a href="#pricing" className="hover:text-[#a1a1aa] transition-colors">Pricing</a>
+            <a href="mailto:support@speedread.app" className="hover:text-[#a1a1aa] transition-colors">Contact</a>
           </div>
+          <div className="text-[11px] text-[#3f3f46]">© 2026 SpeedRead</div>
         </div>
       </footer>
     </div>
