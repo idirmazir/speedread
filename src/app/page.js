@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-// ─── RSVP Demo ─────────────────────────────────────────────
+// ——— RSVP Demo ————————————————————————————————————
 function RSVPDemo() {
   const text = "The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years."
   const words = text.split(' ')
@@ -50,7 +50,7 @@ function RSVPDemo() {
   )
 }
 
-// ─── Animated Counter ──────────────────────────────────────
+// ——— Animated Counter ——————————————————————————————
 function Counter({ target, suffix = '' }) {
   const [n, setN] = useState(0)
   const [go, setGo] = useState(false)
@@ -63,9 +63,9 @@ function Counter({ target, suffix = '' }) {
   return <span ref={ref}>{n}{suffix}</span>
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // LANDING PAGE
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0)
   useEffect(() => { const h = () => setScrollY(window.scrollY); window.addEventListener('scroll', h, { passive: true }); return () => window.removeEventListener('scroll', h) }, [])
@@ -80,10 +80,10 @@ export default function LandingPage() {
         <div className="absolute bottom-1/4 right-1/3 w-[400px] h-[400px] rounded-full blur-[150px]" style={{ backgroundColor: 'rgba(52,211,153,0.03)' }} />
       </div>
 
-      {/* ─── Nav ─────────────────────────────────────────── */}
+      {/* ——— Nav ——————————————————————————————————— */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrollY > 40 ? 'backdrop-blur-xl' : ''}`} style={{ borderBottom: scrollY > 40 ? '1px solid #27272a' : '1px solid transparent', backgroundColor: scrollY > 40 ? 'rgba(9,9,11,0.85)' : 'transparent' }}>
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="text-[22px] tracking-tight"><span className="font-light">Speed</span><span className="text-emerald-400 font-semibold">Read</span></div>
+          <div className="text-[26px] tracking-tight"><span className="font-light">Flash</span><span className="text-emerald-400 font-semibold">Read</span></div>
           <div className="flex items-center gap-5">
             <a href="#features" className="text-[#71717a] hover:text-[#e4e4e7] text-[13px] transition-colors hidden md:block">Features</a>
             <a href="#how" className="text-[#71717a] hover:text-[#e4e4e7] text-[13px] transition-colors hidden md:block">How It Works</a>
@@ -93,14 +93,14 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ─── Hero ────────────────────────────────────────── */}
+      {/* ——— Hero —————————————————————————————————— */}
       <section className="relative pt-32 pb-20 md:pt-40 md:pb-28">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-14 items-center">
             <div className="space-y-7">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)' }}>
                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                <span className="text-emerald-400 text-[10px] font-semibold tracking-[0.12em] uppercase">Backed by reading science</span>
+                <span className="text-emerald-400 text-[10px] font-semibold tracking-[0.12em] uppercase">RSVP speed reading</span>
               </div>
               <h1 className="text-5xl md:text-6xl lg:text-[68px] font-light leading-[1.08] tracking-tight">
                 200 pages.<br />
@@ -116,21 +116,13 @@ export default function LandingPage() {
                 </a>
                 <span className="text-[#52525b] text-[12px]">No credit card</span>
               </div>
-              <div className="flex items-center gap-4 pt-2">
-                <div className="flex -space-x-1.5">
-                  {['#10b981', '#059669', '#047857', '#065f46'].map((c, i) => (
-                    <div key={i} className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white" style={{ backgroundColor: c, border: '2px solid #09090b' }}>{['S', 'M', 'L', 'K'][i]}</div>
-                  ))}
-                </div>
-                <p className="text-[#52525b] text-[12px]">Used at <span className="text-[#a1a1aa]">UWA</span>, <span className="text-[#a1a1aa]">Perth</span>, <span className="text-[#a1a1aa]">Western Australia</span></p>
-              </div>
             </div>
             <RSVPDemo />
           </div>
         </div>
       </section>
 
-      {/* ─── Stats ───────────────────────────────────────── */}
+      {/* ——— Stats ————————————————————————————————— */}
       <section style={{ borderTop: '1px solid #27272a', borderBottom: '1px solid #27272a', backgroundColor: 'rgba(24,24,27,0.3)' }}>
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
@@ -144,7 +136,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── Pain Point ──────────────────────────────────── */}
+      {/* ——— Pain Point ———————————————————————————— */}
       <section className="py-20 md:py-28">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-[44px] font-light leading-tight tracking-tight mb-5">
@@ -152,12 +144,12 @@ export default function LandingPage() {
             <span className="text-[#52525b]">Sound familiar?</span>
           </h2>
           <p className="text-[15px] text-[#71717a] font-light leading-relaxed max-w-xl mx-auto">
-            The average student spends 17 hours per week on readings. Law students? Over 25. Your eyes waste time jumping between words, re-reading lines, losing focus. RSVP eliminates all of that.
+            Students spend 15–25 hours per week on assigned readings. Your eyes waste time jumping between words, re-reading lines, losing focus. RSVP eliminates all of that.
           </p>
         </div>
       </section>
 
-      {/* ─── How It Works ────────────────────────────────── */}
+      {/* ——— How It Works —————————————————————————— */}
       <section id="how" className="py-20 md:py-28" style={{ backgroundColor: 'rgba(24,24,27,0.2)' }}>
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-14">
@@ -185,7 +177,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── Features ────────────────────────────────────── */}
+      {/* ——— Features ————————————————————————————— */}
       <section id="features" className="py-20 md:py-28">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-14">
@@ -211,7 +203,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── Use Cases ───────────────────────────────────── */}
+      {/* ——— Use Cases ————————————————————————————— */}
       <section className="py-20 md:py-28" style={{ backgroundColor: 'rgba(24,24,27,0.2)' }}>
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-14">
@@ -235,7 +227,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── Pricing ─────────────────────────────────────── */}
+      {/* ——— Pricing ——————————————————————————————— */}
       <section id="pricing" className="py-20 md:py-28">
         <div className="max-w-3xl mx-auto px-6">
           <div className="text-center mb-14">
@@ -264,11 +256,20 @@ export default function LandingPage() {
               <div className="text-[10px] font-semibold tracking-[0.15em] uppercase text-emerald-400 mb-1.5">Pro</div>
               <div className="flex items-baseline gap-0.5 mb-0.5"><span className="text-3xl font-light text-[#e4e4e7]">$8</span><span className="text-[12px] text-[#71717a]">/mo</span></div>
               <div className="text-[11px] text-[#52525b] mb-6">or $60/year (save 37%)</div>
-              <div className="space-y-2.5 mb-6">
-                {['Everything in Free', 'PDF & DOCX upload', 'Unlimited documents', 'Cloud library', 'Progress & auto-save', 'Reading analytics', 'Custom themes & fonts', 'Offline mode'].map((x, i) => (
+              <div className="space-y-2.5 mb-4">
+                {['Everything in Free', 'PDF & DOCX upload', 'Unlimited documents', 'Cloud library', 'Progress & auto-save', 'Custom themes & fonts'].map((x, i) => (
                   <div key={i} className="flex items-start gap-2.5 text-[12px]">
                     <svg className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <span className="text-[#e4e4e7] font-light">{x}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Coming soon items */}
+              <div className="space-y-2.5 mb-6 pt-2.5" style={{ borderTop: '1px solid #27272a' }}>
+                {['Reading analytics', 'Offline mode'].map((x, i) => (
+                  <div key={i} className="flex items-start gap-2.5 text-[12px]">
+                    <svg className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#52525b' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span className="text-[#71717a] font-light">{x} <span className="text-[10px] text-[#52525b]">· Coming soon</span></span>
                   </div>
                 ))}
               </div>
@@ -278,7 +279,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── CTA ─────────────────────────────────────────── */}
+      {/* ——— CTA ——————————————————————————————————— */}
       <section className="py-20 md:py-28 relative">
         <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(52,211,153,0.03), transparent)' }} />
         <div className="max-w-2xl mx-auto px-6 text-center relative z-10">
@@ -290,22 +291,22 @@ export default function LandingPage() {
             Join students who read smarter. Free forever, no strings attached.
           </p>
           <a href="/app" className="inline-flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-semibold text-[15px] text-black shadow-xl hover:shadow-emerald-500/20 transition-all hover:scale-[1.02]">
-            Start Speed Reading Now
+            Try FlashRead Free
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
           </a>
         </div>
       </section>
 
-      {/* ─── Footer ──────────────────────────────────────── */}
+      {/* ——— Footer ———————————————————————————————— */}
       <footer style={{ borderTop: '1px solid #27272a' }} className="py-10">
         <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="text-[18px] tracking-tight"><span className="font-light">Speed</span><span className="text-emerald-400 font-semibold">Read</span></div>
+          <div className="text-[20px] tracking-tight"><span className="font-light">Flash</span><span className="text-emerald-400 font-semibold">Read</span></div>
           <div className="flex items-center gap-6 text-[12px] text-[#52525b]">
             <a href="#features" className="hover:text-[#a1a1aa] transition-colors">Features</a>
             <a href="#pricing" className="hover:text-[#a1a1aa] transition-colors">Pricing</a>
-            <a href="mailto:support@speedread.app" className="hover:text-[#a1a1aa] transition-colors">Contact</a>
+            <a href="mailto:support@flashread.com.au" className="hover:text-[#a1a1aa] transition-colors">Contact</a>
           </div>
-          <div className="text-[11px] text-[#3f3f46]">© 2026 SpeedRead</div>
+          <div className="text-[11px] text-[#3f3f46]">© 2026 FlashRead</div>
         </div>
       </footer>
     </div>

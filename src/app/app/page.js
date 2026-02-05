@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '../../lib/supabase-client'
 
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // TOAST SYSTEM
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function Toast({ toasts, removeToast, theme }) {
   const t = theme
   return (
@@ -45,9 +45,9 @@ function Toast({ toasts, removeToast, theme }) {
   )
 }
 
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // CONFIRM MODAL
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmLabel, theme }) {
   if (!isOpen) return null
   const t = theme
@@ -66,9 +66,9 @@ function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmLabe
   )
 }
 
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // KEYBOARD SHORTCUT OVERLAY
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function ShortcutOverlay({ isOpen, onClose, theme }) {
   if (!isOpen) return null
   const t = theme
@@ -106,9 +106,9 @@ function ShortcutOverlay({ isOpen, onClose, theme }) {
   )
 }
 
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // ONBOARDING BANNER
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 const SAMPLE_TEXT = `The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years. The shelves stretched impossibly high, filled with volumes no one had touched in decades. Her fingers traced the spines of forgotten books, each one holding secrets that could change everything she thought she knew about the world. This was the beginning of something extraordinary.`
 
 function OnboardingBanner({ onLoadSample, onDismiss, theme }) {
@@ -122,9 +122,9 @@ function OnboardingBanner({ onLoadSample, onDismiss, theme }) {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold tracking-tight mb-1" style={{ color: t.text }}>Welcome to SpeedRead</h3>
+          <h3 className="text-[14px] font-semibold tracking-tight mb-1" style={{ color: t.text }}>Welcome to FlashRead</h3>
           <p className="text-[12px] leading-relaxed mb-3.5" style={{ color: t.textMuted }}>
-            Words appear one at a time, right where your eyes are focused. No scanning, no re-reading — just pure comprehension at 2-3x your normal speed.
+            Words appear one at a time, right where your eyes are focused. No scanning, no re-reading – just pure comprehension at 2-3x your normal speed.
           </p>
           <div className="flex items-center gap-2.5">
             <button onClick={onLoadSample} className="px-4 py-2 rounded-lg text-[12px] font-semibold shadow-lg transition-all hover:opacity-90" style={{ backgroundColor: t.accent, color: t.btnText }}>Try Sample Text</button>
@@ -136,9 +136,9 @@ function OnboardingBanner({ onLoadSample, onDismiss, theme }) {
   )
 }
 
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // EMPTY LIBRARY STATE
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function EmptyLibrary({ theme }) {
   const t = theme
   return (
@@ -154,9 +154,9 @@ function EmptyLibrary({ theme }) {
   )
 }
 
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // MAIN APP
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 export default function Home() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -206,7 +206,7 @@ export default function Home() {
   }, [])
   const removeToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
-  // Theme system (unchanged)
+  // Theme system
   const THEMES = {
     emerald:   { name: 'Emerald',   label: 'Default',   bg: '#09090b', surface: '#18181b', surfaceHover: '#27272a', border: '#27272a', borderLight: '#3f3f46', text: '#e4e4e7', textMuted: '#71717a', textFaint: '#52525b', accent: '#34d399', accentHover: '#6ee7b7', accentGlow: 'rgba(52,211,153,0.07)', progress: '#10b981', btnText: '#000000' },
     midnight:  { name: 'Midnight',  label: 'Deep Focus', bg: '#030712', surface: '#0f172a', surfaceHover: '#1e293b', border: '#1e293b', borderLight: '#334155', text: '#e2e8f0', textMuted: '#64748b', textFaint: '#475569', accent: '#60a5fa', accentHover: '#93c5fd', accentGlow: 'rgba(96,165,250,0.07)', progress: '#3b82f6', btnText: '#000000' },
@@ -240,8 +240,8 @@ export default function Home() {
   const mainFont = '"SF Pro Display", -apple-system, system-ui, sans-serif'
 
   // Persist prefs
-  useEffect(() => { try { const s = localStorage.getItem('sr-prefs'); if (s) { const p = JSON.parse(s); if (p.t && THEMES[p.t]) setThemeKey(p.t); if (p.f && FONTS[p.f]) setFontKey(p.f); if (p.fc) setFocalColor(p.fc) } } catch {} }, [])
-  useEffect(() => { try { localStorage.setItem('sr-prefs', JSON.stringify({ t: themeKey, f: fontKey, fc: focalColor })) } catch {} }, [themeKey, fontKey, focalColor])
+  useEffect(() => { try { const s = localStorage.getItem('fr-prefs'); if (s) { const p = JSON.parse(s); if (p.t && THEMES[p.t]) setThemeKey(p.t); if (p.f && FONTS[p.f]) setFontKey(p.f); if (p.fc) setFocalColor(p.fc) } } catch {} }, [])
+  useEffect(() => { try { localStorage.setItem('fr-prefs', JSON.stringify({ t: themeKey, f: fontKey, fc: focalColor })) } catch {} }, [themeKey, fontKey, focalColor])
   useEffect(() => { const fn = FONTS[fontKey]; if (!fn) return; if (fn.gf) { const id = `gf-${fontKey}`; if (!document.getElementById(id)) { const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = `https://fonts.googleapis.com/css2?family=${fn.gf}&display=swap`; document.head.appendChild(l) } } if (fn.cdn) { const id = `cf-${fontKey}`; if (!document.getElementById(id)) { const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = fn.cdn; document.head.appendChild(l) } } }, [fontKey])
 
   const fsc = { 1: 'text-3xl md:text-4xl', 2: 'text-4xl md:text-5xl', 3: 'text-5xl md:text-6xl', 4: 'text-6xl md:text-7xl', 5: 'text-7xl md:text-8xl', 6: 'text-8xl md:text-9xl' }
@@ -304,7 +304,7 @@ export default function Home() {
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return
-    if (file.size > 10 * 1024 * 1024) { addToast('File too large — max 10MB.', 'error'); e.target.value = ''; return }
+    if (file.size > 10 * 1024 * 1024) { addToast('File too large – max 10MB.', 'error'); e.target.value = ''; return }
     const pdf = file.type === 'application/pdf' || file.name.endsWith('.pdf')
     const docx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')
     if ((pdf || docx) && !isPro) { setUpgradeReason('pdf'); setShowUpgradeModal(true); e.target.value = ''; return }
@@ -313,15 +313,15 @@ export default function Home() {
       if (pdf) {
         setUploadProgress(30); const fd = new FormData(); fd.append('file', file); setUploadProgress(50)
         const res = await fetch('/api/extract-pdf', { method: 'POST', body: fd }); const r = await res.json(); setUploadProgress(80)
-        if (res.ok) { setText(r.text); setDocTitle(file.name.replace('.pdf', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`PDF loaded — ${r.text.split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000) }
+        if (res.ok) { setText(r.text); setDocTitle(file.name.replace('.pdf', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`PDF loaded – ${r.text.split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000) }
         else { addToast(r.error || 'Failed to process PDF', 'error'); setUploadProgress(0) }
       } else if (docx) {
         setUploadProgress(30); const m = await import('mammoth'); const ab = await file.arrayBuffer(); setUploadProgress(60)
         const r = await m.extractRawText({ arrayBuffer: ab })
-        if (r.value?.trim()) { setText(r.value.trim()); setDocTitle(file.name.replace('.docx', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`DOCX loaded — ${r.value.trim().split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000) }
+        if (r.value?.trim()) { setText(r.value.trim()); setDocTitle(file.name.replace('.docx', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`DOCX loaded – ${r.value.trim().split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000) }
         else throw new Error('empty')
       } else if (file.type === 'text/plain') {
-        setUploadProgress(60); const tx = await file.text(); setText(tx); setDocTitle(file.name.replace('.txt', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`File loaded — ${tx.split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000)
+        setUploadProgress(60); const tx = await file.text(); setText(tx); setDocTitle(file.name.replace('.txt', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`File loaded – ${tx.split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000)
       } else { addToast('Unsupported file type. Use PDF, DOCX, or TXT.', 'error'); setUploadProgress(0) }
     } catch { addToast('Unable to process file. It may be image-based, protected, or corrupted.', 'error'); setUploadProgress(0) }
     e.target.value = ''
@@ -329,11 +329,11 @@ export default function Home() {
 
   const startReading = () => { const pw = parseText(text); if (!pw.length) return; if (!isPro && pw.length > 5000) { setUpgradeReason('wordcount'); setShowUpgradeModal(true); return }; setWords(pw); setShowReader(true); if (user) saveDocument() }
   const togglePlay = useCallback(() => setIsPlaying(p => !p), [])
-  const loadSampleText = () => { setText(SAMPLE_TEXT); setDocTitle('Sample: The Ancient Library'); setShowOnboarding(false); addToast('Sample loaded — hit Start Reading!', 'success') }
+  const loadSampleText = () => { setText(SAMPLE_TEXT); setDocTitle('Sample: The Ancient Library'); setShowOnboarding(false); addToast('Sample loaded – hit Start Reading!', 'success') }
 
   useEffect(() => { if (isPlaying && words.length > 0) { intervalRef.current = setInterval(() => { setCurrentIndex(p => { if (p >= words.length - 1) { setIsPlaying(false); return p } return p + 1 }); if (rampSpeed > 0) setWpm(p => Math.min(maxWpm, p + rampSpeed * 0.05)) }, (60 / wpm) * 1000) } return () => { if (intervalRef.current) clearInterval(intervalRef.current) } }, [isPlaying, wpm, words.length, rampSpeed, maxWpm])
 
-  // Silent auto-save (no toast)
+  // Silent auto-save
   useEffect(() => {
     if (user && isPro && currentDocId && showReader) {
       const i = setInterval(async () => { await supabase.from('documents').update({ current_position: currentIndex, total_words: words.length, updated_at: new Date().toISOString() }).eq('id', currentDocId) }, 10000)
@@ -341,7 +341,7 @@ export default function Home() {
     }
   }, [user, isPro, currentDocId, showReader, currentIndex, words.length])
 
-  // Keyboard — guard inputs
+  // Keyboard – guard inputs
   useEffect(() => {
     const h = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
@@ -371,14 +371,60 @@ export default function Home() {
     )
   }
 
-  const Slider = ({ value, min, max, step, onChange }) => {
-    const pct = ((value - min) / (max - min)) * 100
+  const Slider = ({ value, min, max, step, onChange, label, format }) => {
+    const trackRef = useRef(null)
+    const [dragVal, setDragVal] = useState(null)
+    const isDragging = dragVal !== null
+    const display = isDragging ? dragVal : value
+    const pct = ((display - min) / (max - min)) * 100
+    const snap = (v) => Math.min(max, Math.max(min, Math.round((v - min) / step) * step + min))
+    const valFromX = useCallback((clientX) => {
+      const rect = trackRef.current.getBoundingClientRect()
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+      return min + ratio * (max - min)
+    }, [min, max])
+    useEffect(() => {
+      if (!isDragging) return
+      const onMove = (e) => {
+        const x = e.touches ? e.touches[0].clientX : e.clientX
+        setDragVal(snap(valFromX(x)))
+      }
+      const onUp = (e) => {
+        const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX
+        const final = snap(valFromX(x))
+        setDragVal(null)
+        onChange(final)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+      window.addEventListener('touchmove', onMove, { passive: false })
+      window.addEventListener('touchend', onUp)
+      return () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        window.removeEventListener('touchmove', onMove)
+        window.removeEventListener('touchend', onUp)
+      }
+    }, [isDragging, min, max, step, valFromX, onChange])
+    const onStart = (e) => {
+      e.preventDefault()
+      const x = e.touches ? e.touches[0].clientX : e.clientX
+      const snapped = snap(valFromX(x))
+      setDragVal(snapped)
+      onChange(snapped)
+    }
     return (
-      <div className="relative w-full h-6 flex items-center group">
-        <div className="absolute inset-x-0 h-[5px] rounded-full" style={{ backgroundColor: t.border }} />
-        <div className="absolute left-0 h-[5px] rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: t.accent, opacity: 0.7 }} />
-        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="absolute inset-0 w-full opacity-0 cursor-pointer z-10" />
-        <div className="absolute h-4 w-4 rounded-full shadow-md transition-all pointer-events-none" style={{ left: `calc(${pct}% - 8px)`, backgroundColor: t.accent, boxShadow: `0 0 0 3px ${t.surface}, 0 2px 8px rgba(0,0,0,0.3)` }} />
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px]" style={{ color: t.textFaint }}>{label}</span>
+          <span className="text-[11px] font-semibold tabular-nums" style={{ color: t.accent }}>{format(display)}</span>
+        </div>
+        <div ref={trackRef} className="relative w-full h-8 flex items-center cursor-pointer select-none touch-none"
+          onMouseDown={onStart} onTouchStart={onStart}>
+          <div className="absolute inset-x-0 h-[5px] rounded-full" style={{ backgroundColor: t.border }} />
+          <div className="absolute left-0 h-[5px] rounded-full" style={{ width: `${pct}%`, backgroundColor: t.accent, opacity: 0.7 }} />
+          <div className="absolute h-5 w-5 rounded-full shadow-lg" style={{ left: `calc(${pct}% - 10px)`, backgroundColor: t.accent, boxShadow: `0 0 0 3px ${t.surface}, 0 2px 8px rgba(0,0,0,0.3)`, transform: isDragging ? 'scale(1.15)' : 'scale(1)', transition: isDragging ? 'transform 0.1s' : 'all 0.15s' }} />
+        </div>
       </div>
     )
   }
@@ -446,7 +492,7 @@ export default function Home() {
       <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: t.accentGlow }} />
       <div className="relative backdrop-blur-2xl rounded-2xl p-9 w-full max-w-[360px] shadow-2xl" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
         <div className="text-center mb-9">
-          <h1 className="text-[28px] tracking-tight mb-1"><span className="font-light" style={{ color: t.text }}>Speed</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
+          <h1 className="text-[28px] tracking-tight mb-1"><span className="font-light" style={{ color: t.text }}>Flash</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
           <p className="text-[13px]" style={{ color: t.textMuted }}>{isSignUp ? 'Create your account' : 'Welcome back'}</p>
         </div>
         <form onSubmit={handleAuth} className="space-y-2.5">
@@ -488,7 +534,7 @@ export default function Home() {
           </div>
         </div>
         {showThemePanel && <ThemePanel />}
-        {/* Word — tap to play */}
+        {/* Word – tap to play */}
         <div className="flex-1 flex items-center justify-center relative px-4 md:px-8 cursor-pointer" onClick={togglePlay}>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-24" style={{ background: `linear-gradient(transparent, ${t.border}50, transparent)` }} />
           <div className="relative z-10 w-[90vw] max-w-[700px] py-14">
@@ -541,7 +587,7 @@ export default function Home() {
         {/* Header */}
         <header className="flex items-center justify-between mb-8 md:mb-12">
           <div>
-            <h1 className="text-[28px] tracking-tight mb-0.5"><span className="font-light" style={{ color: t.text }}>Speed</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
+            <h1 className="text-[28px] tracking-tight mb-0.5"><span className="font-light" style={{ color: t.text }}>Flash</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
             <p className="text-[10px] tracking-[0.15em] uppercase" style={{ color: t.textFaint }}>RSVP Speed Reading</p>
           </div>
           <div className="flex items-center gap-2.5">
@@ -627,15 +673,12 @@ export default function Home() {
             <h3 className="text-[12px] font-semibold tracking-wide mb-5" style={{ color: t.textFaint }}>Settings</h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
               {[
-                { label: 'Speed', val: `${wpm} wpm`, min: 100, max: 1000, step: 25, v: wpm, fn: setWpm },
-                { label: 'Ramp', val: rampSpeed === 0 ? 'Off' : `+${rampSpeed}/min`, min: 0, max: 50, step: 5, v: rampSpeed, fn: setRampSpeed },
-                { label: 'Max speed', val: `${maxWpm} wpm`, min: 200, max: 1000, step: 50, v: maxWpm, fn: setMaxWpm },
-                { label: 'Font size', val: fsl[fontSize], min: 1, max: 6, step: 1, v: fontSize, fn: setFontSize },
+                { label: 'Speed', format: (v) => `${v} wpm`, min: 100, max: 1000, step: 25, v: wpm, fn: setWpm },
+                { label: 'Ramp', format: (v) => v === 0 ? 'Off' : `+${v}/min`, min: 0, max: 50, step: 5, v: rampSpeed, fn: setRampSpeed },
+                { label: 'Max speed', format: (v) => `${v} wpm`, min: 200, max: 1000, step: 50, v: maxWpm, fn: setMaxWpm },
+                { label: 'Font size', format: (v) => fsl[v], min: 1, max: 6, step: 1, v: fontSize, fn: setFontSize },
               ].map((c, i) => (
-                <div key={i}>
-                  <div className="flex items-center justify-between mb-2"><span className="text-[11px]" style={{ color: t.textFaint }}>{c.label}</span><span className="text-[11px] font-semibold tabular-nums" style={{ color: t.accent }}>{c.val}</span></div>
-                  <Slider value={c.v} min={c.min} max={c.max} step={c.step} onChange={c.fn} />
-                </div>
+                <Slider key={i} value={c.v} min={c.min} max={c.max} step={c.step} onChange={c.fn} label={c.label} format={c.format} />
               ))}
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${t.border}` }}>

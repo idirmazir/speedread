@@ -12,20 +12,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "SpeedRead — Speed Reading for Students",
+  title: "FlashRead – Speed Reading for Students",
   description: "Read 2-3x faster with RSVP technology. Upload PDFs, DOCX files, or paste any text. Built for law, medicine, and university students.",
-  keywords: ["speed reading", "RSVP", "study tool", "PDF reader", "university", "law student", "medical student"],
-  authors: [{ name: "SpeedRead" }],
+  keywords: ["speed reading", "RSVP", "study tool", "PDF reader", "university", "law student", "medical student", "flashread"],
+  authors: [{ name: "FlashRead" }],
   openGraph: {
-    title: "SpeedRead — Speed Reading for Students",
+    title: "FlashRead – Speed Reading for Students",
     description: "Read 2-3x faster with RSVP technology. Upload PDFs, DOCX files, or paste any text.",
-    siteName: "SpeedRead",
+    siteName: "FlashRead",
     type: "website",
     locale: "en_AU",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpeedRead — Speed Reading for Students",
+    title: "FlashRead – Speed Reading for Students",
     description: "Read 2-3x faster with RSVP technology. Upload PDFs, DOCX files, or paste any text.",
   },
   icons: {
