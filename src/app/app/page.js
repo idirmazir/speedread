@@ -107,6 +107,79 @@ function ShortcutOverlay({ isOpen, onClose, theme }) {
 }
 
 // ═══════════════════════════════════════════════════════
+// RECALL OVERLAY
+// ═══════════════════════════════════════════════════════
+function RecallOverlay({ isOpen, type, recallText, setRecallText, onDone, onSkip, theme }) {
+  if (!isOpen) return null
+  const t = theme
+  const textareaRef = useRef(null)
+  useEffect(() => { if (isOpen && textareaRef.current) textareaRef.current.focus() }, [isOpen])
+  const isEnd = type === 'end'
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
+      <div className="absolute inset-0 backdrop-blur-lg" style={{ backgroundColor: t.bg + 'ee' }} />
+      <div className="relative w-full max-w-[440px]">
+        {/* Icon */}
+        <div className="flex justify-center mb-5">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: t.accentGlow, border: `1px solid ${t.accent}25` }}>
+            <svg className="w-7 h-7" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+        </div>
+        {/* Content */}
+        <div className="text-center mb-5">
+          <h3 className="text-[18px] font-semibold tracking-tight mb-1.5" style={{ color: t.text }}>
+            {isEnd ? 'Quick recall' : 'Checkpoint'}
+          </h3>
+          <p className="text-[13px] leading-relaxed" style={{ color: t.textMuted }}>
+            {isEnd
+              ? "You finished! What do you remember from what you just read?"
+              : "Pause — what do you remember so far?"
+            }
+          </p>
+        </div>
+        {/* Textarea */}
+        <textarea
+          ref={textareaRef}
+          value={recallText}
+          onChange={(e) => setRecallText(e.target.value)}
+          placeholder="Type what you remember…"
+          className="w-full h-[120px] px-4 py-3.5 rounded-xl resize-none focus:outline-none transition-all text-[13px] leading-relaxed mb-4"
+          style={{
+            backgroundColor: t.surface,
+            border: `1px solid ${recallText.trim() ? t.accent + '40' : t.border}`,
+            color: t.text,
+            caretColor: t.accent,
+          }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) onDone() }}
+        />
+        <p className="text-[10px] text-center mb-4" style={{ color: t.textFaint, opacity: 0.6 }}>
+          This isn't graded — just recalling strengthens memory
+        </p>
+        {/* Buttons */}
+        <div className="flex items-center justify-center gap-2.5">
+          <button
+            onClick={onSkip}
+            className="px-5 py-2.5 rounded-lg text-[12px] font-medium transition-all hover:opacity-80"
+            style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.textMuted }}
+          >
+            {isEnd ? 'Finish' : 'Skip'}
+          </button>
+          <button
+            onClick={onDone}
+            className="px-5 py-2.5 rounded-lg text-[12px] font-semibold shadow-lg transition-all hover:opacity-90"
+            style={{ backgroundColor: t.accent, color: t.btnText }}
+          >
+            {isEnd ? 'Done' : 'Continue Reading'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════
 // ONBOARDING BANNER
 // ═══════════════════════════════════════════════════════
 const SAMPLE_TEXT = `The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years. The shelves stretched impossibly high, filled with volumes no one had touched in decades. Her fingers traced the spines of forgotten books, each one holding secrets that could change everything she thought she knew about the world. This was the beginning of something extraordinary.`
@@ -154,6 +227,136 @@ function EmptyLibrary({ theme }) {
   )
 }
 
+// ═══════════════════════════════════════════════════════════════
+// READING ANALYTICS DASHBOARD (PRO)
+// ═══════════════════════════════════════════════════════════════
+function AnalyticsDashboard({ sessions, theme }) {
+  const t = theme
+
+  const totalWordsRead = sessions.reduce((sum, s) => sum + (s.words_read || 0), 0)
+  const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0) / 60
+  const avgWpm = sessions.length > 0
+    ? Math.round(sessions.reduce((sum, s) => sum + (s.avg_wpm || 0), 0) / sessions.length)
+    : 0
+
+  // Streak: count consecutive days with sessions
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const sessionDays = new Set(sessions.map(s => {
+    const d = new Date(s.created_at)
+    d.setHours(0, 0, 0, 0)
+    return d.getTime()
+  }))
+  let streak = 0
+  const checkDate = new Date(today)
+  while (sessionDays.has(checkDate.getTime())) {
+    streak++
+    checkDate.setDate(checkDate.getDate() - 1)
+  }
+
+  // Last 7 days bar chart
+  const last7 = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    d.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(d)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+    const daySessions = sessions.filter(s => {
+      const sd = new Date(s.created_at)
+      return sd >= d && sd < dayEnd
+    })
+    const words = daySessions.reduce((sum, s) => sum + (s.words_read || 0), 0)
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    last7.push({ day: dayNames[d.getDay()], words })
+  }
+  const maxWords = Math.max(...last7.map(d => d.words), 1)
+
+  // WPM trend (last 10 sessions, oldest first for left-to-right)
+  const recentSessions = sessions.slice(0, 10).reverse()
+
+  return (
+    <section className="mb-8 md:mb-12">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: t.text }}>Reading Analytics</h2>
+        <span className="text-[10px] font-semibold tracking-[0.1em] uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: t.accentGlow, color: t.accent, border: `1px solid ${t.accent}20` }}>Pro</span>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-4">
+        {[
+          { label: 'Words read', value: totalWordsRead >= 1000 ? `${(totalWordsRead / 1000).toFixed(1)}k` : totalWordsRead.toString(), icon: '📖' },
+          { label: 'Time reading', value: totalMinutes >= 60 ? `${(totalMinutes / 60).toFixed(1)}h` : `${Math.round(totalMinutes)}m`, icon: '⏱' },
+          { label: 'Avg. speed', value: `${avgWpm}`, suffix: ' wpm', icon: '⚡' },
+          { label: 'Day streak', value: streak.toString(), suffix: streak === 1 ? ' day' : ' days', icon: '🔥' },
+        ].map((stat, i) => (
+          <div key={i} className="rounded-xl p-4" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
+            <div className="text-[13px] mb-1">{stat.icon}</div>
+            <div className="text-[18px] font-semibold tabular-nums" style={{ color: t.text }}>
+              {stat.value}
+              <span className="text-[11px] font-normal" style={{ color: t.textFaint }}>{stat.suffix || ''}</span>
+            </div>
+            <div className="text-[10px]" style={{ color: t.textFaint }}>{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts row */}
+      <div className="grid md:grid-cols-2 gap-2.5">
+        {/* 7-day activity bar chart */}
+        <div className="rounded-xl p-4" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-[11px] font-semibold mb-3" style={{ color: t.textFaint }}>Last 7 days</div>
+          <div className="flex items-end gap-1.5" style={{ height: 80 }}>
+            {last7.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <div className="w-full rounded-sm transition-all" style={{
+                  height: `${Math.max(4, (d.words / maxWords) * 64)}px`,
+                  backgroundColor: d.words > 0 ? t.accent : t.border,
+                  opacity: d.words > 0 ? 0.7 : 0.3,
+                }} />
+                <span className="text-[9px]" style={{ color: t.textFaint }}>{d.day}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Cumulative words over time */}
+        <div className="rounded-xl p-4" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-[11px] font-semibold mb-3" style={{ color: t.textFaint }}>Total words over time</div>
+          {recentSessions.length < 2 ? (
+            <div className="flex items-center justify-center" style={{ height: 80 }}>
+              <span className="text-[11px]" style={{ color: t.textFaint }}>Complete 2+ sessions to see your progress</span>
+            </div>
+          ) : (
+            <div className="relative" style={{ height: 80 }}>
+              <svg width="100%" height="100%" viewBox="0 0 200 100" preserveAspectRatio="none">
+                {(() => {
+                  let cumulative = 0
+                  const cumulativePoints = recentSessions.map(s => {
+                    cumulative += (s.words_read || 0)
+                    return cumulative
+                  })
+                  const maxC = cumulativePoints[cumulativePoints.length - 1] || 1
+                  const step = 200 / Math.max(cumulativePoints.length - 1, 1)
+                  const points = cumulativePoints.map((c, i) => `${i * step},${90 - (c / maxC) * 70}`).join(' ')
+                  const fillPoints = `0,90 ${points} ${(cumulativePoints.length - 1) * step},90`
+                  return (
+                    <><polygon points={fillPoints} fill={t.accent} opacity="0.1" /><polyline points={points} fill="none" stroke={t.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" /></>
+                  )
+                })()}
+              </svg>
+              <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[9px]" style={{ color: t.textFaint }}>
+                <span>{recentSessions[0]?.words_read || 0}</span>
+                <span>{totalWordsRead >= 1000 ? `${(totalWordsRead / 1000).toFixed(1)}k` : totalWordsRead} words</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ═══════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════
@@ -186,7 +389,6 @@ export default function Home() {
   const [fontKey, setFontKey] = useState('system')
   const [focalColor, setFocalColor] = useState('theme')
 
-  // NEW STATE
   const [toasts, setToasts] = useState([])
   const toastIdRef = useRef(0)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, docId: null, docTitle: '' })
@@ -194,6 +396,23 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [savingDoc, setSavingDoc] = useState(false)
   const [loadingDocs, setLoadingDocs] = useState(false)
+
+  // ── Recall state ──
+  const [recallInterval, setRecallInterval] = useState(0) // 0 = off, else word count
+  const [showRecall, setShowRecall] = useState(false)
+  const [recallText, setRecallText] = useState('')
+  const [recallType, setRecallType] = useState('checkpoint') // 'checkpoint' or 'end'
+  const lastRecallIndexRef = useRef(0)
+
+  // ── URL import state ──
+  const [importUrl, setImportUrl] = useState('')
+  const [importingUrl, setImportingUrl] = useState(false)
+
+  // ── Analytics state ──
+  const [readingSessions, setReadingSessions] = useState([])
+  const sessionStartRef = useRef(null)
+  const sessionWordsStartRef = useRef(0)
+  const wpmSamplesRef = useRef([])
 
   const intervalRef = useRef(null)
   const supabase = createClient()
@@ -249,7 +468,7 @@ export default function Home() {
 
   // Auth & Data
   useEffect(() => { const g = async () => { const { data: { session } } = await supabase.auth.getSession(); setUser(session?.user ?? null); setLoading(false) }; g(); const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => { setUser(s?.user ?? null); setLoading(false) }); return () => subscription.unsubscribe() }, [])
-  useEffect(() => { if (user) { loadDocuments(); loadProfile() } }, [user])
+  useEffect(() => { if (user) { loadDocuments(); loadProfile(); loadReadingSessions() } }, [user])
 
   // Onboarding check
   useEffect(() => {
@@ -268,6 +487,33 @@ export default function Home() {
     setLoadingDocs(false)
   }
 
+  // ── Analytics: load sessions ──
+  const loadReadingSessions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('reading_sessions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (!error && data) setReadingSessions(data)
+    } catch {}
+  }
+
+  // ── Analytics: save a reading session ──
+  const saveReadingSession = async (wordsRead, durationSec, avgWpmVal) => {
+    if (!user || wordsRead < 10) return
+    try {
+      await supabase.from('reading_sessions').insert({
+        user_id: user.id,
+        document_id: currentDocId || null,
+        words_read: wordsRead,
+        duration_seconds: Math.round(durationSec),
+        avg_wpm: Math.round(avgWpmVal),
+      })
+      loadReadingSessions()
+    } catch {}
+  }
+
   const handleAuth = async (e) => {
     e.preventDefault(); setLoading(true)
     const { error } = isSignUp ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
@@ -276,11 +522,13 @@ export default function Home() {
     setLoading(false)
   }
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); setDocuments([]); setCurrentDocId(null); addToast('Signed out', 'info') }
+  const handleSignOut = async () => { await supabase.auth.signOut(); setDocuments([]); setCurrentDocId(null); setReadingSessions([]); addToast('Signed out', 'info') }
 
   const saveDocument = async () => {
     if (!user || !text.trim()) return; setSavingDoc(true)
-    const wc = parseText(text).length; const d = { user_id: user.id, title: docTitle || 'Untitled', content: text, word_count: wc, current_position: currentIndex, total_words: words.length || wc }
+    const wc = parseText(text).length
+    const autoTitle = docTitle.trim() || parseText(text).slice(0, 6).join(' ').replace(/[.,;:!?]$/, '') + '…'
+    const d = { user_id: user.id, title: autoTitle, content: text, word_count: wc, current_position: currentIndex, total_words: words.length || wc }
     if (currentDocId) { const { error } = await supabase.from('documents').update({ ...d, updated_at: new Date().toISOString() }).eq('id', currentDocId); if (error) addToast('Failed to save', 'error'); else addToast('Document saved', 'success') }
     else { const { data, error } = await supabase.from('documents').insert(d).select(); if (error) addToast('Failed to save', 'error'); else { setCurrentDocId(data[0].id); addToast('Saved to library', 'success') } }
     setSavingDoc(false); loadDocuments()
@@ -327,11 +575,136 @@ export default function Home() {
     e.target.value = ''
   }
 
-  const startReading = () => { const pw = parseText(text); if (!pw.length) return; if (!isPro && pw.length > 5000) { setUpgradeReason('wordcount'); setShowUpgradeModal(true); return }; setWords(pw); setShowReader(true); if (user) saveDocument() }
-  const togglePlay = useCallback(() => setIsPlaying(p => !p), [])
+  // ── Start reading: now begins a session ──
+  const startReading = () => {
+    const pw = parseText(text)
+    if (!pw.length) return
+    if (!isPro && pw.length > 5000) { setUpgradeReason('wordcount'); setShowUpgradeModal(true); return }
+    setWords(pw)
+    setShowReader(true)
+    setShowRecall(false)
+    hasShownEndRecallRef.current = false
+    // If doc was finished (position at end), restart from beginning
+    if (currentIndex >= pw.length - 1) setCurrentIndex(0)
+    sessionStartRef.current = Date.now()
+    sessionWordsStartRef.current = currentIndex >= pw.length - 1 ? 0 : currentIndex
+    wpmSamplesRef.current = []
+    lastRecallIndexRef.current = currentIndex >= pw.length - 1 ? 0 : currentIndex
+    if (user) saveDocument()
+  }
+
+  const togglePlay = useCallback(() => { if (!showRecall) setIsPlaying(p => !p) }, [showRecall])
   const loadSampleText = () => { setText(SAMPLE_TEXT); setDocTitle('Sample: The Ancient Library'); setShowOnboarding(false); addToast('Sample loaded – hit Start Reading!', 'success') }
 
-  useEffect(() => { if (isPlaying && words.length > 0) { intervalRef.current = setInterval(() => { setCurrentIndex(p => { if (p >= words.length - 1) { setIsPlaying(false); return p } return p + 1 }); if (rampSpeed > 0) setWpm(p => Math.min(maxWpm, p + rampSpeed * 0.05)) }, (60 / wpm) * 1000) } return () => { if (intervalRef.current) clearInterval(intervalRef.current) } }, [isPlaying, wpm, words.length, rampSpeed, maxWpm])
+  // ── URL import ──
+  const handleUrlImport = async () => {
+    if (!importUrl.trim()) return
+    if (!isPro) { setUpgradeReason('url'); setShowUpgradeModal(true); return }
+    setImportingUrl(true)
+    try {
+      const res = await fetch('/api/extract-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok && data.text) {
+        setText(data.text)
+        setDocTitle(data.title || '')
+        setImportUrl('')
+        setShowOnboarding(false)
+        addToast(`Imported "${data.title}" — ${data.wordCount?.toLocaleString()} words`, 'success')
+      } else {
+        addToast(data.error || 'Failed to extract text from URL', 'error')
+      }
+    } catch {
+      addToast('Failed to connect. Check the URL and try again.', 'error')
+    }
+    setImportingUrl(false)
+  }
+
+  // ── Playback interval: samples WPM for analytics ──
+  useEffect(() => {
+    if (isPlaying && words.length > 0) {
+      intervalRef.current = setInterval(() => {
+        setCurrentIndex(p => {
+          if (p >= words.length - 1) { setIsPlaying(false); return p }
+          return p + 1
+        })
+        wpmSamplesRef.current.push(wpm)
+        if (rampSpeed > 0) setWpm(p => Math.min(maxWpm, p + rampSpeed * 0.05))
+      }, (60 / wpm) * 1000)
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [isPlaying, wpm, words.length, rampSpeed, maxWpm])
+
+  // ── Recall interval checkpoint: watches currentIndex during playback ──
+  useEffect(() => {
+    if (!isPlaying || !showReader || recallInterval <= 0 || showRecall) return
+    const wordsSinceLastRecall = currentIndex - lastRecallIndexRef.current
+    if (wordsSinceLastRecall >= recallInterval && currentIndex < words.length - 1) {
+      setIsPlaying(false)
+      setRecallType('checkpoint')
+      setRecallText('')
+      setShowRecall(true)
+      lastRecallIndexRef.current = currentIndex
+    }
+  }, [currentIndex, isPlaying, showReader, recallInterval, showRecall, words.length])
+
+  // ── Save session + end recall when reader reaches end ──
+  const hasShownEndRecallRef = useRef(false)
+  useEffect(() => {
+    if (showReader && !isPlaying && currentIndex >= words.length - 1 && words.length > 0) {
+      // Save analytics (only if session is active)
+      if (sessionStartRef.current) {
+        const durationSec = (Date.now() - sessionStartRef.current) / 1000
+        const wordsRead = currentIndex - sessionWordsStartRef.current + 1
+        const avgW = wpmSamplesRef.current.length > 0
+          ? Math.round(wpmSamplesRef.current.reduce((a, b) => a + b, 0) / wpmSamplesRef.current.length)
+          : wpm
+        if (user && isPro) saveReadingSession(wordsRead, durationSec, avgW)
+        sessionStartRef.current = null
+        // Show end recall only once per reading session
+        if (!hasShownEndRecallRef.current) {
+          hasShownEndRecallRef.current = true
+          setRecallType('end')
+          setRecallText('')
+          setShowRecall(true)
+        }
+      }
+    }
+  }, [isPlaying, currentIndex, words.length, showReader])
+
+  // ── Exit reader: saves partial session if meaningful ──
+  const exitReader = useCallback(() => {
+    setIsPlaying(false)
+    if (user && isPro && sessionStartRef.current) {
+      const durationSec = (Date.now() - sessionStartRef.current) / 1000
+      const wordsRead = currentIndex - sessionWordsStartRef.current
+      const avgW = wpmSamplesRef.current.length > 0
+        ? Math.round(wpmSamplesRef.current.reduce((a, b) => a + b, 0) / wpmSamplesRef.current.length)
+        : wpm
+      if (wordsRead >= 20 && durationSec >= 10) saveReadingSession(wordsRead, durationSec, avgW)
+    }
+    sessionStartRef.current = null
+    setShowReader(false)
+    if (user && isPro && currentDocId) {
+      supabase.from('documents').update({ current_position: currentIndex, total_words: words.length, updated_at: new Date().toISOString() }).eq('id', currentDocId)
+    }
+  }, [user, isPro, currentDocId, currentIndex, words.length, wpm])
+
+  // ── Recall handlers ──
+  const handleRecallDone = useCallback(() => {
+    setShowRecall(false)
+    setRecallText('')
+    if (recallType === 'end') exitReader()
+  }, [recallType, exitReader])
+
+  const handleRecallSkip = useCallback(() => {
+    setShowRecall(false)
+    setRecallText('')
+    if (recallType === 'end') exitReader()
+  }, [recallType, exitReader])
 
   // Silent auto-save
   useEffect(() => {
@@ -518,10 +891,11 @@ export default function Home() {
       <main className="min-h-screen flex flex-col overflow-hidden" style={{ backgroundColor: t.bg, color: t.text, fontFamily: mainFont }}>
         <Toast toasts={toasts} removeToast={removeToast} theme={t} />
         <ShortcutOverlay isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} theme={t} />
+        <RecallOverlay isOpen={showRecall} type={recallType} recallText={recallText} setRecallText={setRecallText} onDone={handleRecallDone} onSkip={handleRecallSkip} theme={t} />
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] rounded-full blur-[100px] pointer-events-none" style={{ backgroundColor: t.accentGlow }} />
         {/* Header */}
         <div className="flex items-center justify-between px-5 md:px-7 py-4" style={{ borderBottom: `1px solid ${t.border}` }}>
-          <button onClick={() => { setShowReader(false); setIsPlaying(false); if (user && isPro && currentDocId) { supabase.from('documents').update({ current_position: currentIndex, total_words: words.length, updated_at: new Date().toISOString() }).eq('id', currentDocId) } }} className="flex items-center gap-2 transition-all hover:opacity-70 group" style={{ color: t.textMuted }}>
+          <button onClick={exitReader} className="flex items-center gap-2 transition-all hover:opacity-70 group" style={{ color: t.textMuted }}>
             <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             <span className="text-[13px] hidden sm:inline">Library</span>
           </button>
@@ -535,7 +909,7 @@ export default function Home() {
         </div>
         {showThemePanel && <ThemePanel />}
         {/* Word – tap to play */}
-        <div className="flex-1 flex items-center justify-center relative px-4 md:px-8 cursor-pointer" onClick={togglePlay}>
+        <div className="flex-1 flex items-center justify-center relative px-4 md:px-8 cursor-pointer" onClick={() => { if (!showRecall) togglePlay() }}>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-24" style={{ background: `linear-gradient(transparent, ${t.border}50, transparent)` }} />
           <div className="relative z-10 w-[90vw] max-w-[700px] py-14">
             {renderWord(words[currentIndex])}
@@ -609,6 +983,11 @@ export default function Home() {
         {/* Onboarding */}
         {showOnboarding && !text && <OnboardingBanner onLoadSample={loadSampleText} onDismiss={() => setShowOnboarding(false)} theme={t} />}
 
+        {/* Analytics Dashboard — Pro only */}
+        {user && isPro && readingSessions.length > 0 && (
+          <AnalyticsDashboard sessions={readingSessions} theme={t} />
+        )}
+
         {/* Library */}
         {user && isPro && (
           <section className="mb-8 md:mb-12">
@@ -659,11 +1038,46 @@ export default function Home() {
                 {uploadProgress > 0 && <div className="absolute inset-0 backdrop-blur-sm rounded-xl flex items-center justify-center" style={{ backgroundColor: t.bg + 'ee' }}><div className="text-center"><div className="text-xl font-light tabular-nums mb-1" style={{ color: t.accent }}>{uploadProgress}%</div><div className="text-[11px]" style={{ color: t.textFaint }}>{uploadProgress === 100 && showUploadSuccess ? 'Done' : 'Processing'}</div></div></div>}
               </label>
             </div>
+            {/* URL import */}
+            <div className="mt-2.5 flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleUrlImport() }}
+                  placeholder={isPro ? 'Paste article URL…' : 'URL import · Pro'}
+                  disabled={importingUrl}
+                  className="w-full px-3.5 py-2.5 rounded-xl focus:outline-none transition-all text-[12px] pr-9"
+                  style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.text, caretColor: t.accent, opacity: importingUrl ? 0.6 : 1 }}
+                />
+                {importUrl.trim() && !importingUrl && (
+                  <button onClick={() => setImportUrl('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-80 transition-opacity" style={{ color: t.textFaint }}>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleUrlImport}
+                disabled={!importUrl.trim() || importingUrl}
+                className="px-4 py-2.5 rounded-xl text-[11px] font-semibold transition-all hover:opacity-90 disabled:opacity-40 flex items-center gap-2 flex-shrink-0"
+                style={{ backgroundColor: t.accent, color: t.btnText }}
+              >
+                {importingUrl ? (
+                  <><span className="inline-block w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: t.btnText, borderTopColor: 'transparent' }} />Importing</>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                    Import
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           <div>
             <h3 className="text-[12px] font-semibold tracking-wide mb-2.5" style={{ color: t.textFaint }}>Paste text</h3>
             <textarea value={text} onChange={(e) => { setText(e.target.value); if (e.target.value.trim()) setShowOnboarding(false) }} placeholder="Paste your text here..." className="w-full h-[168px] px-4 py-3.5 rounded-xl resize-none focus:outline-none transition-all text-[13px] leading-relaxed" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.text, caretColor: t.accent, fontFamily: 'ui-monospace, "SF Mono", monospace' }} />
-            {user && isPro && <input type="text" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Title (optional)" className="w-full mt-2 px-4 py-2.5 rounded-xl focus:outline-none transition-all text-[13px]" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.text, caretColor: t.accent }} />}
+            {user && isPro && <input type="text" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Title (optional)" className="w-full mt-2 px-3.5 py-2.5 rounded-xl focus:outline-none transition-all text-[12px]" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.text, caretColor: t.accent }} />}
           </div>
         </section>
 
@@ -671,12 +1085,13 @@ export default function Home() {
         {text && (
           <section className="rounded-xl p-5 md:p-6 mb-8" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
             <h3 className="text-[12px] font-semibold tracking-wide mb-5" style={{ color: t.textFaint }}>Settings</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-5 mb-6">
               {[
                 { label: 'Speed', format: (v) => `${v} wpm`, min: 100, max: 1000, step: 25, v: wpm, fn: setWpm },
                 { label: 'Ramp', format: (v) => v === 0 ? 'Off' : `+${v}/min`, min: 0, max: 50, step: 5, v: rampSpeed, fn: setRampSpeed },
                 { label: 'Max speed', format: (v) => `${v} wpm`, min: 200, max: 1000, step: 50, v: maxWpm, fn: setMaxWpm },
                 { label: 'Font size', format: (v) => fsl[v], min: 1, max: 6, step: 1, v: fontSize, fn: setFontSize },
+                { label: 'Recall every', format: (v) => v === 0 ? 'Off' : `${v} words`, min: 0, max: 500, step: 50, v: recallInterval, fn: setRecallInterval },
               ].map((c, i) => (
                 <Slider key={i} value={c.v} min={c.min} max={c.max} step={c.step} onChange={c.fn} label={c.label} format={c.format} />
               ))}
@@ -709,9 +1124,9 @@ export default function Home() {
             <button onClick={() => setShowUpgradeModal(false)} className="absolute top-3.5 right-3.5 w-6 h-6 rounded flex items-center justify-center hover:opacity-70" style={{ color: t.textFaint }}><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg></button>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ backgroundColor: t.accentGlow, border: `1px solid ${t.accent}20` }}><svg className="w-5 h-5" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div>
             <h3 className="text-lg font-semibold tracking-tight mb-1" style={{ color: t.text }}>Upgrade to <span style={{ color: t.accent }}>Pro</span></h3>
-            <p className="text-[13px] leading-relaxed mb-4" style={{ color: t.textMuted }}>{upgradeReason === 'pdf' ? 'PDF & DOCX uploads require Pro.' : upgradeReason === 'wordcount' ? 'Free is limited to 5,000 words.' : 'Get the full experience.'}</p>
+            <p className="text-[13px] leading-relaxed mb-4" style={{ color: t.textMuted }}>{upgradeReason === 'pdf' ? 'PDF & DOCX uploads require Pro.' : upgradeReason === 'url' ? 'URL import requires Pro.' : upgradeReason === 'wordcount' ? 'Free is limited to 5,000 words.' : 'Get the full experience.'}</p>
             <div className="rounded-lg p-3.5 mb-4" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
-              <div className="space-y-1.5">{['PDF & DOCX uploads', 'Unlimited words', 'Cloud library', 'Auto-save & analytics'].map((x, i) => (<div key={i} className="flex items-center gap-2 text-[12px]"><svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg><span style={{ color: t.text }}>{x}</span></div>))}</div>
+              <div className="space-y-1.5">{['PDF & DOCX uploads', 'URL import', 'Unlimited words', 'Cloud library', 'Auto-save & analytics'].map((x, i) => (<div key={i} className="flex items-center gap-2 text-[12px]"><svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg><span style={{ color: t.text }}>{x}</span></div>))}</div>
             </div>
             <div className="flex items-baseline gap-1 mb-4"><span className="text-xl font-semibold tabular-nums" style={{ color: t.text }}>$8</span><span className="text-[12px]" style={{ color: t.textMuted }}>/mo</span><span className="text-[11px] ml-1.5" style={{ color: t.textFaint }}>or $60/yr</span></div>
             <button onClick={() => setShowUpgradeModal(false)} className="w-full py-2.5 rounded-xl font-semibold text-[13px] shadow-lg transition-all hover:opacity-90 mb-2" style={{ backgroundColor: t.accent, color: t.btnText }}>Upgrade to Pro</button>
