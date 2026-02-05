@@ -807,7 +807,7 @@ export default function Home() {
   const ThemePanel = ({ overlay }) => (
     <div className={overlay ? 'fixed inset-0 z-40' : 'absolute right-0 top-0 bottom-0 z-30'}>
       {overlay && <div className="absolute inset-0 backdrop-blur-sm" style={{ backgroundColor: t.bg + 'cc' }} onClick={() => setShowThemePanel(false)} />}
-      <div className="absolute right-0 top-0 bottom-0 w-[300px] overflow-y-auto" style={{ backgroundColor: t.surface, borderLeft: `1px solid ${t.border}`, boxShadow: '-12px 0 40px rgba(0,0,0,0.25)' }}>
+      <div className="absolute right-0 top-0 bottom-0 w-full sm:w-[300px] overflow-y-auto" style={{ backgroundColor: t.surface, borderLeft: `1px solid ${t.border}`, boxShadow: '-12px 0 40px rgba(0,0,0,0.25)' }}>
         <div className="p-5">
           <div className="flex items-center justify-between mb-5">
             <span className="text-[13px] font-semibold tracking-tight" style={{ color: t.text }}>Appearance</span>
@@ -903,7 +903,7 @@ export default function Home() {
             <span style={{ color: t.textMuted }}><span className="font-semibold tabular-nums" style={{ color: t.text }}>{Math.round(wpm)}</span> <span className="hidden sm:inline">wpm</span></span>
             <span style={{ color: t.textMuted }}>{fsl[fontSize]}</span>
             <span style={{ color: t.textMuted }}><span className="font-semibold tabular-nums" style={{ color: t.text }}>{remMin}</span> <span className="hidden sm:inline">min</span></span>
-            <button onClick={() => setShowShortcuts(true)} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textFaint }} title="Shortcuts (/)"><span className="text-[11px] font-mono font-bold">?</span></button>
+            <button onClick={() => setShowShortcuts(true)} className="w-8 h-8 rounded-lg items-center justify-center transition-all hover:opacity-80 hidden sm:flex" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textFaint }} title="Shortcuts (/)"><span className="text-[11px] font-mono font-bold">?</span></button>
             <button onClick={() => setShowThemePanel(!showThemePanel)} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all" style={{ backgroundColor: showThemePanel ? t.accentGlow : 'transparent', border: `1px solid ${showThemePanel ? t.accent + '40' : 'transparent'}`, color: showThemePanel ? t.accent : t.textMuted }}><PaintbrushIcon /></button>
           </div>
         </div>
@@ -927,17 +927,17 @@ export default function Home() {
               <button onClick={togglePlay} className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105" style={{ backgroundColor: isPlaying ? '#f59e0b' : t.accent, color: isPlaying ? '#000' : t.btnText, boxShadow: `0 4px 20px ${isPlaying ? 'rgba(245,158,11,0.25)' : t.accentGlow}` }}>{isPlaying ? <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M14,19H18V5H14M6,19H10V5H6V19Z" /></svg> : <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z" /></svg>}</button>
               <button onClick={() => setCurrentIndex(p => Math.min(words.length - 1, p + 10))} className="w-11 h-11 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z" /></svg></button>
             </div>
-            <div className="flex items-center justify-center gap-7 text-[11px]">
+            <div className="flex items-center justify-center gap-5 sm:gap-7 text-[11px]">
               <div className="flex items-center gap-1.5">
-                <button onClick={() => setFontSize(p => Math.max(1, p - 1))} className="w-8 h-8 md:w-7 md:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><span className="text-[10px] font-bold">A−</span></button>
+                <button onClick={() => setFontSize(p => Math.max(1, p - 1))} className="w-9 h-9 sm:w-7 sm:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><span className="text-[10px] font-bold">A−</span></button>
                 <span className="w-7 text-center" style={{ color: t.textFaint }}>Size</span>
-                <button onClick={() => setFontSize(p => Math.min(6, p + 1))} className="w-8 h-8 md:w-7 md:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><span className="text-[10px] font-bold">A+</span></button>
+                <button onClick={() => setFontSize(p => Math.min(6, p + 1))} className="w-9 h-9 sm:w-7 sm:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><span className="text-[10px] font-bold">A+</span></button>
               </div>
               <div className="w-px h-3.5" style={{ backgroundColor: t.border }} />
               <div className="flex items-center gap-1.5">
-                <button onClick={() => setWpm(p => Math.max(100, p - 25))} className="w-8 h-8 md:w-7 md:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg></button>
+                <button onClick={() => setWpm(p => Math.max(100, p - 25))} className="w-9 h-9 sm:w-7 sm:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg></button>
                 <span className="w-9 text-center" style={{ color: t.textFaint }}>Speed</span>
-                <button onClick={() => setWpm(p => Math.min(1000, p + 25))} className="w-8 h-8 md:w-7 md:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg></button>
+                <button onClick={() => setWpm(p => Math.min(1000, p + 25))} className="w-9 h-9 sm:w-7 sm:h-7 rounded-md flex items-center justify-center transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg></button>
               </div>
             </div>
             <div className="flex justify-center items-center gap-5 mt-5 text-[11px]" style={{ color: t.textFaint }}>
@@ -1085,7 +1085,7 @@ export default function Home() {
         {text && (
           <section className="rounded-xl p-5 md:p-6 mb-8" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
             <h3 className="text-[12px] font-semibold tracking-wide mb-5" style={{ color: t.textFaint }}>Settings</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-5 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-5 gap-y-5 mb-6">
               {[
                 { label: 'Speed', format: (v) => `${v} wpm`, min: 100, max: 1000, step: 25, v: wpm, fn: setWpm },
                 { label: 'Ramp', format: (v) => v === 0 ? 'Off' : `+${v}/min`, min: 0, max: 50, step: 5, v: rampSpeed, fn: setRampSpeed },
