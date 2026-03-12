@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '../../lib/supabase-client'
 
 // ═══════════════════════════════════════════════════════
@@ -358,6 +358,44 @@ function AnalyticsDashboard({ sessions, theme }) {
 }
 
 // ═══════════════════════════════════════════════════════
+// CONSTANTS (module-level — never recreated on render)
+// ═══════════════════════════════════════════════════════
+const MAIN_FONT = '"SF Pro Display", -apple-system, system-ui, sans-serif'
+
+const FSC = { 1: 'text-3xl md:text-4xl', 2: 'text-4xl md:text-5xl', 3: 'text-5xl md:text-6xl', 4: 'text-6xl md:text-7xl', 5: 'text-7xl md:text-8xl', 6: 'text-8xl md:text-9xl' }
+const FSL = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: 'XXL' }
+
+const calculateORP = (w) => { const l = w.length; if (l <= 2) return 0; if (l <= 5) return 1; if (l <= 9) return 2; if (l <= 13) return 3; return Math.floor(l * 0.3) }
+const parseText = (x) => x.replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0)
+
+const THEMES = {
+  emerald:   { name: 'Emerald',   label: 'Default',   bg: '#09090b', surface: '#18181b', surfaceHover: '#27272a', border: '#27272a', borderLight: '#3f3f46', text: '#e4e4e7', textMuted: '#71717a', textFaint: '#52525b', accent: '#34d399', accentHover: '#6ee7b7', accentGlow: 'rgba(52,211,153,0.07)', progress: '#10b981', btnText: '#000000' },
+  midnight:  { name: 'Midnight',  label: 'Deep Focus', bg: '#030712', surface: '#0f172a', surfaceHover: '#1e293b', border: '#1e293b', borderLight: '#334155', text: '#e2e8f0', textMuted: '#64748b', textFaint: '#475569', accent: '#60a5fa', accentHover: '#93c5fd', accentGlow: 'rgba(96,165,250,0.07)', progress: '#3b82f6', btnText: '#000000' },
+  parchment: { name: 'Parchment', label: 'Light',      bg: '#faf6f1', surface: '#f0ebe4', surfaceHover: '#e6e0d6', border: '#d6cfc4', borderLight: '#c4bdb2', text: '#2c2416', textMuted: '#8a7e6f', textFaint: '#a89d8e', accent: '#b45309', accentHover: '#d97706', accentGlow: 'rgba(180,83,9,0.06)', progress: '#d97706', btnText: '#ffffff' },
+  rose:      { name: 'Rosé',      label: 'Warm',       bg: '#0f0a12', surface: '#1a1020', surfaceHover: '#261830', border: '#2d1f3a', borderLight: '#3d2d4f', text: '#ede5f0', textMuted: '#9f8aad', textFaint: '#7a6888', accent: '#f472b6', accentHover: '#f9a8d4', accentGlow: 'rgba(244,114,182,0.07)', progress: '#ec4899', btnText: '#000000' },
+  ocean:     { name: 'Ocean',     label: 'Cool',       bg: '#0a1628', surface: '#0f1d32', surfaceHover: '#162a46', border: '#1e3a5f', borderLight: '#2a4a73', text: '#e0e7ff', textMuted: '#7089aa', textFaint: '#5a7394', accent: '#22d3ee', accentHover: '#67e8f9', accentGlow: 'rgba(34,211,238,0.07)', progress: '#06b6d4', btnText: '#0a1628' },
+  noir:      { name: 'Noir',      label: 'Contrast',   bg: '#000000', surface: '#0a0a0a', surfaceHover: '#171717', border: '#262626', borderLight: '#404040', text: '#fafafa', textMuted: '#737373', textFaint: '#525252', accent: '#e5e5e5', accentHover: '#ffffff', accentGlow: 'rgba(255,255,255,0.05)', progress: '#a3a3a3', btnText: '#000000' },
+}
+const FONTS = {
+  system:      { name: 'System',       label: 'Default', family: '"SF Pro Display", -apple-system, system-ui, sans-serif', weight: 300, ls: '-0.03em' },
+  georgia:     { name: 'Georgia',      label: 'Serif',   family: 'Georgia, "Times New Roman", serif', weight: 400, ls: '0em' },
+  literata:    { name: 'Literata',     label: 'Reading', family: '"Literata", Georgia, serif', weight: 400, ls: '0.01em', gf: 'Literata:wght@300;400;500;600' },
+  jetbrains:   { name: 'JetBrains',   label: 'Mono',    family: '"JetBrains Mono", monospace', weight: 300, ls: '-0.02em', gf: 'JetBrains+Mono:wght@300;400;500' },
+  atkinson:    { name: 'Atkinson',    label: 'Legible', family: '"Atkinson Hyperlegible", Verdana, sans-serif', weight: 400, ls: '0.01em', gf: 'Atkinson+Hyperlegible:wght@400;700' },
+  opendyslexic:{ name: 'OpenDyslexic',label: 'Dyslexia',family: '"OpenDyslexic", sans-serif', weight: 400, ls: '0.02em', cdn: 'https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/open-dyslexic-regular.css' },
+}
+const FOCAL_COLORS = [
+  { key: 'theme', label: 'Theme' },
+  { key: '#ef4444', label: 'Red', c: '#ef4444' },
+  { key: '#f97316', label: 'Orange', c: '#f97316' },
+  { key: '#eab308', label: 'Yellow', c: '#eab308' },
+  { key: '#22c55e', label: 'Green', c: '#22c55e' },
+  { key: '#3b82f6', label: 'Blue', c: '#3b82f6' },
+  { key: '#a855f7', label: 'Purple', c: '#a855f7' },
+  { key: '#ec4899', label: 'Pink', c: '#ec4899' },
+]
+
+// ═══════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════
 export default function Home() {
@@ -416,6 +454,7 @@ export default function Home() {
 
   const intervalRef = useRef(null)
   const supabase = createClient()
+  const parsedWords = useMemo(() => parseText(text), [text])
 
   // Toast helpers
   const addToast = useCallback((message, type = 'info') => {
@@ -425,46 +464,15 @@ export default function Home() {
   }, [])
   const removeToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
-  // Theme system
-  const THEMES = {
-    emerald:   { name: 'Emerald',   label: 'Default',   bg: '#09090b', surface: '#18181b', surfaceHover: '#27272a', border: '#27272a', borderLight: '#3f3f46', text: '#e4e4e7', textMuted: '#71717a', textFaint: '#52525b', accent: '#34d399', accentHover: '#6ee7b7', accentGlow: 'rgba(52,211,153,0.07)', progress: '#10b981', btnText: '#000000' },
-    midnight:  { name: 'Midnight',  label: 'Deep Focus', bg: '#030712', surface: '#0f172a', surfaceHover: '#1e293b', border: '#1e293b', borderLight: '#334155', text: '#e2e8f0', textMuted: '#64748b', textFaint: '#475569', accent: '#60a5fa', accentHover: '#93c5fd', accentGlow: 'rgba(96,165,250,0.07)', progress: '#3b82f6', btnText: '#000000' },
-    parchment: { name: 'Parchment', label: 'Light',      bg: '#faf6f1', surface: '#f0ebe4', surfaceHover: '#e6e0d6', border: '#d6cfc4', borderLight: '#c4bdb2', text: '#2c2416', textMuted: '#8a7e6f', textFaint: '#a89d8e', accent: '#b45309', accentHover: '#d97706', accentGlow: 'rgba(180,83,9,0.06)', progress: '#d97706', btnText: '#ffffff' },
-    rose:      { name: 'Rosé',      label: 'Warm',       bg: '#0f0a12', surface: '#1a1020', surfaceHover: '#261830', border: '#2d1f3a', borderLight: '#3d2d4f', text: '#ede5f0', textMuted: '#9f8aad', textFaint: '#7a6888', accent: '#f472b6', accentHover: '#f9a8d4', accentGlow: 'rgba(244,114,182,0.07)', progress: '#ec4899', btnText: '#000000' },
-    ocean:     { name: 'Ocean',     label: 'Cool',       bg: '#0a1628', surface: '#0f1d32', surfaceHover: '#162a46', border: '#1e3a5f', borderLight: '#2a4a73', text: '#e0e7ff', textMuted: '#7089aa', textFaint: '#5a7394', accent: '#22d3ee', accentHover: '#67e8f9', accentGlow: 'rgba(34,211,238,0.07)', progress: '#06b6d4', btnText: '#0a1628' },
-    noir:      { name: 'Noir',      label: 'Contrast',   bg: '#000000', surface: '#0a0a0a', surfaceHover: '#171717', border: '#262626', borderLight: '#404040', text: '#fafafa', textMuted: '#737373', textFaint: '#525252', accent: '#e5e5e5', accentHover: '#ffffff', accentGlow: 'rgba(255,255,255,0.05)', progress: '#a3a3a3', btnText: '#000000' },
-  }
-  const FONTS = {
-    system:      { name: 'System',       label: 'Default', family: '"SF Pro Display", -apple-system, system-ui, sans-serif', weight: 300, ls: '-0.03em' },
-    georgia:     { name: 'Georgia',      label: 'Serif',   family: 'Georgia, "Times New Roman", serif', weight: 400, ls: '0em' },
-    literata:    { name: 'Literata',     label: 'Reading', family: '"Literata", Georgia, serif', weight: 400, ls: '0.01em', gf: 'Literata:wght@300;400;500;600' },
-    jetbrains:   { name: 'JetBrains',   label: 'Mono',    family: '"JetBrains Mono", monospace', weight: 300, ls: '-0.02em', gf: 'JetBrains+Mono:wght@300;400;500' },
-    atkinson:    { name: 'Atkinson',    label: 'Legible', family: '"Atkinson Hyperlegible", Verdana, sans-serif', weight: 400, ls: '0.01em', gf: 'Atkinson+Hyperlegible:wght@400;700' },
-    opendyslexic:{ name: 'OpenDyslexic',label: 'Dyslexia',family: '"OpenDyslexic", sans-serif', weight: 400, ls: '0.02em', cdn: 'https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/open-dyslexic-regular.css' },
-  }
-  const FOCAL_COLORS = [
-    { key: 'theme', label: 'Theme' },
-    { key: '#ef4444', label: 'Red', c: '#ef4444' },
-    { key: '#f97316', label: 'Orange', c: '#f97316' },
-    { key: '#eab308', label: 'Yellow', c: '#eab308' },
-    { key: '#22c55e', label: 'Green', c: '#22c55e' },
-    { key: '#3b82f6', label: 'Blue', c: '#3b82f6' },
-    { key: '#a855f7', label: 'Purple', c: '#a855f7' },
-    { key: '#ec4899', label: 'Pink', c: '#ec4899' },
-  ]
-
   const t = THEMES[themeKey] || THEMES.emerald
   const f = FONTS[fontKey] || FONTS.system
   const fc = focalColor === 'theme' ? t.accent : focalColor
-  const mainFont = '"SF Pro Display", -apple-system, system-ui, sans-serif'
 
   // Persist prefs
   useEffect(() => { try { const s = localStorage.getItem('fr-prefs'); if (s) { const p = JSON.parse(s); if (p.t && THEMES[p.t]) setThemeKey(p.t); if (p.f && FONTS[p.f]) setFontKey(p.f); if (p.fc) setFocalColor(p.fc) } } catch {} }, [])
   useEffect(() => { try { localStorage.setItem('fr-prefs', JSON.stringify({ t: themeKey, f: fontKey, fc: focalColor })) } catch {} }, [themeKey, fontKey, focalColor])
   useEffect(() => { const fn = FONTS[fontKey]; if (!fn) return; if (fn.gf) { const id = `gf-${fontKey}`; if (!document.getElementById(id)) { const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = `https://fonts.googleapis.com/css2?family=${fn.gf}&display=swap`; document.head.appendChild(l) } } if (fn.cdn) { const id = `cf-${fontKey}`; if (!document.getElementById(id)) { const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = fn.cdn; document.head.appendChild(l) } } }, [fontKey])
 
-  const fsc = { 1: 'text-3xl md:text-4xl', 2: 'text-4xl md:text-5xl', 3: 'text-5xl md:text-6xl', 4: 'text-6xl md:text-7xl', 5: 'text-7xl md:text-8xl', 6: 'text-8xl md:text-9xl' }
-  const fsl = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: 'XXL' }
 
   // Auth & Data
   useEffect(() => { const g = async () => { const { data: { session } } = await supabase.auth.getSession(); setUser(session?.user ?? null); setLoading(false) }; g(); const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => { setUser(s?.user ?? null); setLoading(false) }); return () => subscription.unsubscribe() }, [])
@@ -526,8 +534,8 @@ export default function Home() {
 
   const saveDocument = async () => {
     if (!user || !text.trim()) return; setSavingDoc(true)
-    const wc = parseText(text).length
-    const autoTitle = docTitle.trim() || parseText(text).slice(0, 6).join(' ').replace(/[.,;:!?]$/, '') + '…'
+    const wc = parsedWords.length
+    const autoTitle = docTitle.trim() || parsedWords.slice(0, 6).join(' ').replace(/[.,;:!?]$/, '') + '…'
     const d = { user_id: user.id, title: autoTitle, content: text, word_count: wc, current_position: currentIndex, total_words: words.length || wc }
     if (currentDocId) { const { error } = await supabase.from('documents').update({ ...d, updated_at: new Date().toISOString() }).eq('id', currentDocId); if (error) addToast('Failed to save', 'error'); else addToast('Document saved', 'success') }
     else { const { data, error } = await supabase.from('documents').insert(d).select(); if (error) addToast('Failed to save', 'error'); else { setCurrentDocId(data[0].id); addToast('Saved to library', 'success') } }
@@ -547,8 +555,6 @@ export default function Home() {
   const cancelDelete = () => setConfirmModal({ isOpen: false, docId: null, docTitle: '' })
 
   // Reading
-  const calculateORP = (w) => { const l = w.length; if (l <= 2) return 0; if (l <= 5) return 1; if (l <= 9) return 2; if (l <= 13) return 3; return Math.floor(l * 0.3) }
-  const parseText = (x) => x.replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0)
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return
@@ -577,10 +583,9 @@ export default function Home() {
 
   // ── Start reading: now begins a session ──
   const startReading = () => {
-    const pw = parseText(text)
-    if (!pw.length) return
-    if (!isPro && pw.length > 5000) { setUpgradeReason('wordcount'); setShowUpgradeModal(true); return }
-    setWords(pw)
+    if (!parsedWords.length) return
+    if (!isPro && parsedWords.length > 5000) { setUpgradeReason('wordcount'); setShowUpgradeModal(true); return }
+    setWords(parsedWords)
     setShowReader(true)
     setShowRecall(false)
     hasShownEndRecallRef.current = false
@@ -736,7 +741,7 @@ export default function Home() {
     if (!word) return null
     const orp = calculateORP(word); const bef = word.slice(0, orp); const foc = word[orp] || ''; const aft = word.slice(orp + 1)
     return (
-      <div className={`${fsc[fontSize]} select-none`} style={{ fontFamily: f.family, fontWeight: f.weight, letterSpacing: f.ls, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+      <div className={`${FSC[fontSize]} select-none`} style={{ fontFamily: f.family, fontWeight: f.weight, letterSpacing: f.ls, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
         <span style={{ color: t.textMuted, textAlign: 'right' }}>{bef}</span>
         <span className="font-semibold relative text-center px-[1px]" style={{ color: fc }}>{foc}<div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full" style={{ backgroundColor: fc, opacity: 0.4 }} /></span>
         <span style={{ color: t.textMuted, textAlign: 'left' }}>{aft}</span>
@@ -860,7 +865,7 @@ export default function Home() {
 
   // ═══════════════════════════ AUTH ═══════════════════════════
   if (showAuth) return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: t.bg, fontFamily: mainFont }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: t.bg, fontFamily: MAIN_FONT }}>
       <Toast toasts={toasts} removeToast={removeToast} theme={t} />
       <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: t.accentGlow }} />
       <div className="relative backdrop-blur-2xl rounded-2xl p-9 w-full max-w-[360px] shadow-2xl" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
@@ -879,7 +884,6 @@ export default function Home() {
           <button onClick={() => setShowAuth(false)} className="text-[12px] transition-colors hover:opacity-80" style={{ color: t.textFaint }}>Continue without account</button>
         </div>
       </div>
-      <style jsx>{`@keyframes slideInRight { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: translateX(0); } } .animate-slide-in-right { animation: slideInRight 0.25s ease-out forwards; }`}</style>
     </div>
   )
 
@@ -888,7 +892,7 @@ export default function Home() {
     const progress = ((currentIndex + 1) / words.length) * 100
     const remMin = Math.ceil((words.length - currentIndex) / wpm)
     return (
-      <main className="min-h-screen flex flex-col overflow-hidden" style={{ backgroundColor: t.bg, color: t.text, fontFamily: mainFont }}>
+      <main className="min-h-screen flex flex-col overflow-hidden" style={{ backgroundColor: t.bg, color: t.text, fontFamily: MAIN_FONT }}>
         <Toast toasts={toasts} removeToast={removeToast} theme={t} />
         <ShortcutOverlay isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} theme={t} />
         <RecallOverlay isOpen={showRecall} type={recallType} recallText={recallText} setRecallText={setRecallText} onDone={handleRecallDone} onSkip={handleRecallSkip} theme={t} />
@@ -901,7 +905,7 @@ export default function Home() {
           </button>
           <div className="flex items-center gap-3 md:gap-5 text-[12px]">
             <span style={{ color: t.textMuted }}><span className="font-semibold tabular-nums" style={{ color: t.text }}>{Math.round(wpm)}</span> <span className="hidden sm:inline">wpm</span></span>
-            <span style={{ color: t.textMuted }}>{fsl[fontSize]}</span>
+            <span style={{ color: t.textMuted }}>{FSL[fontSize]}</span>
             <span style={{ color: t.textMuted }}><span className="font-semibold tabular-nums" style={{ color: t.text }}>{remMin}</span> <span className="hidden sm:inline">min</span></span>
             <button onClick={() => setShowShortcuts(true)} className="w-8 h-8 rounded-lg items-center justify-center transition-all hover:opacity-80 hidden sm:flex" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textFaint }} title="Shortcuts (/)"><span className="text-[11px] font-mono font-bold">?</span></button>
             <button onClick={() => setShowThemePanel(!showThemePanel)} className="w-8 h-8 rounded-lg flex items-center justify-center transition-all" style={{ backgroundColor: showThemePanel ? t.accentGlow : 'transparent', border: `1px solid ${showThemePanel ? t.accent + '40' : 'transparent'}`, color: showThemePanel ? t.accent : t.textMuted }}><PaintbrushIcon /></button>
@@ -946,14 +950,13 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <style jsx>{`@keyframes slideInRight { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: translateX(0); } } .animate-slide-in-right { animation: slideInRight 0.25s ease-out forwards; }`}</style>
-      </main>
+        </main>
     )
   }
 
   // ═══════════════════════════ LIBRARY ═══════════════════════════
   return (
-    <main className="min-h-screen" style={{ backgroundColor: t.bg, color: t.text, fontFamily: mainFont }}>
+    <main className="min-h-screen" style={{ backgroundColor: t.bg, color: t.text, fontFamily: MAIN_FONT }}>
       <Toast toasts={toasts} removeToast={removeToast} theme={t} />
       <ConfirmModal isOpen={confirmModal.isOpen} title="Delete Document" message={`Are you sure you want to delete "${confirmModal.docTitle}"? This cannot be undone.`} onConfirm={confirmDelete} onCancel={cancelDelete} confirmLabel="Delete" theme={t} />
       <div className="fixed inset-0 pointer-events-none overflow-hidden"><div className="absolute -top-40 left-1/3 w-[600px] h-[600px] rounded-full blur-[150px]" style={{ backgroundColor: t.accentGlow }} /></div>
@@ -1090,7 +1093,7 @@ export default function Home() {
                 { label: 'Speed', format: (v) => `${v} wpm`, min: 100, max: 1000, step: 25, v: wpm, fn: setWpm },
                 { label: 'Ramp', format: (v) => v === 0 ? 'Off' : `+${v}/min`, min: 0, max: 50, step: 5, v: rampSpeed, fn: setRampSpeed },
                 { label: 'Max speed', format: (v) => `${v} wpm`, min: 200, max: 1000, step: 50, v: maxWpm, fn: setMaxWpm },
-                { label: 'Font size', format: (v) => fsl[v], min: 1, max: 6, step: 1, v: fontSize, fn: setFontSize },
+                { label: 'Font size', format: (v) => FSL[v], min: 1, max: 6, step: 1, v: fontSize, fn: setFontSize },
                 { label: 'Recall every', format: (v) => v === 0 ? 'Off' : `${v} words`, min: 0, max: 500, step: 50, v: recallInterval, fn: setRecallInterval },
               ].map((c, i) => (
                 <Slider key={i} value={c.v} min={c.min} max={c.max} step={c.step} onChange={c.fn} label={c.label} format={c.format} />
@@ -1098,8 +1101,8 @@ export default function Home() {
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${t.border}` }}>
               <div className="text-[11px]" style={{ color: t.textFaint }}>
-                <span className="font-semibold tabular-nums" style={{ color: t.text }}>{parseText(text).length.toLocaleString()}</span> words · <span className="font-semibold tabular-nums" style={{ color: t.text }}>{Math.ceil(parseText(text).length / wpm)}</span> min
-                {!isPro && parseText(text).length > 5000 && <span className="ml-2" style={{ color: '#f59e0b' }}>· Over free limit</span>}
+                <span className="font-semibold tabular-nums" style={{ color: t.text }}>{parsedWords.length.toLocaleString()}</span> words · <span className="font-semibold tabular-nums" style={{ color: t.text }}>{Math.ceil(parsedWords.length / wpm)}</span> min
+                {!isPro && parsedWords.length > 5000 && <span className="ml-2" style={{ color: '#f59e0b' }}>· Over free limit</span>}
               </div>
               <div className="flex items-center gap-2.5">
                 {user && isPro && <button onClick={saveDocument} disabled={savingDoc} className="px-4 py-2 rounded-lg text-[12px] font-medium transition-all hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.textMuted }}>{savingDoc ? <span className="flex items-center gap-2"><span className="inline-block w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: t.textFaint, borderTopColor: 'transparent' }} />Saving...</span> : 'Save'}</button>}
@@ -1128,14 +1131,13 @@ export default function Home() {
             <div className="rounded-lg p-3.5 mb-4" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
               <div className="space-y-1.5">{['PDF & DOCX uploads', 'URL import', 'Unlimited words', 'Cloud library', 'Auto-save & analytics'].map((x, i) => (<div key={i} className="flex items-center gap-2 text-[12px]"><svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg><span style={{ color: t.text }}>{x}</span></div>))}</div>
             </div>
-            <div className="flex items-baseline gap-1 mb-4"><span className="text-xl font-semibold tabular-nums" style={{ color: t.text }}>$8</span><span className="text-[12px]" style={{ color: t.textMuted }}>/mo</span><span className="text-[11px] ml-1.5" style={{ color: t.textFaint }}>or $60/yr</span></div>
+            <div className="flex items-baseline gap-1 mb-4"><span className="text-xl font-semibold tabular-nums" style={{ color: t.text }}>$5 AUD</span><span className="text-[12px]" style={{ color: t.textMuted }}>/mo</span><span className="text-[11px] ml-1.5" style={{ color: t.textFaint }}>or $35/yr</span></div>
             <button onClick={() => setShowUpgradeModal(false)} className="w-full py-2.5 rounded-xl font-semibold text-[13px] shadow-lg transition-all hover:opacity-90 mb-2" style={{ backgroundColor: t.accent, color: t.btnText }}>Upgrade to Pro</button>
             <button onClick={() => setShowUpgradeModal(false)} className="w-full py-2 text-[11px] transition-colors hover:opacity-70" style={{ color: t.textFaint }}>Maybe later</button>
           </div>
         </div>
       )}
 
-      <style jsx>{`@keyframes slideInRight { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: translateX(0); } } .animate-slide-in-right { animation: slideInRight 0.25s ease-out forwards; }`}</style>
     </main>
   )
 }

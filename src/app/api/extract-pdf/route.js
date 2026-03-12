@@ -8,14 +8,12 @@ export async function POST(request) {
     }
 
     const arrayBuffer = await file.arrayBuffer()
-    const uint8Array = new Uint8Array(arrayBuffer)
+    const buffer = Buffer.from(arrayBuffer)
 
-    const { extractText } = await import('unpdf')
-    const result = await extractText(uint8Array)
+    const pdfParse = (await import('pdf-parse-new')).default
+    const result = await pdfParse(buffer)
 
-    const fullText = Array.isArray(result.text) ? result.text.join(' ') : String(result.text || '')
-
-    if (!fullText.trim()) {
+    if (!result.text?.trim()) {
       return Response.json(
         { error: 'No text found in PDF. The file may be image-based or scanned.' },
         { status: 400 }
@@ -23,8 +21,8 @@ export async function POST(request) {
     }
 
     return Response.json({
-      text: fullText.trim(),
-      pages: result.totalPages,
+      text: result.text.trim(),
+      pages: result.numpages,
       filename: file.name,
     })
   } catch (error) {
