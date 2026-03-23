@@ -17,8 +17,13 @@ Brand is **TempoRead**. Never use "FlashRead", "SpeedRead", "Requiem", `sr-prefs
 src/app/page.js                    → LANDING PAGE at /
 src/app/app/page.js                → MAIN APP at /app    → 90% of dev happens here
 src/app/app/loading.js             → Loading skeleton for /app
+src/app/terms/page.js              → Terms of Service at /terms
+src/app/privacy/page.js            → Privacy Policy at /privacy
 src/app/api/extract-pdf/route.js   → PDF extraction endpoint
 src/app/api/extract-url/route.js   → URL article extraction endpoint
+src/app/api/stripe/checkout/route.js → Stripe Checkout session
+src/app/api/stripe/webhook/route.js  → Stripe webhook handler
+src/app/api/stripe/portal/route.js   → Stripe Customer Portal
 src/app/layout.js                  → Root layout
 src/lib/supabase-client.js         → Browser Supabase client (SSR, use this)
 ```

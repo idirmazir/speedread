@@ -17,8 +17,9 @@
 - Loading skeleton (`loading.js`) for instant /app page feedback
 
 ## Must Do Before Charging Users
-1. Build Stripe integration
-2. Build Terms of Service and Privacy Policy pages
+1. ~~Build Stripe integration~~ — done (checkout, webhook, portal)
+2. ~~Build Terms of Service and Privacy Policy pages~~ — done (/terms, /privacy)
+3. Complete Stripe identity verification (payments paused until verified)
 
 ## Done (Cleanup)
 - ~~Fix theme localStorage key~~ — uses `tr-prefs`

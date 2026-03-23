@@ -396,7 +396,9 @@ export default function LandingPage() {
           <div className="flex items-center gap-6 text-[12px] text-[#52525b]">
             <a href="#features" className="hover:text-[#a1a1aa] transition-colors">Features</a>
             <a href="#pricing" className="hover:text-[#a1a1aa] transition-colors">Pricing</a>
-            <a href="mailto:support@temporead.com.au" className="hover:text-[#a1a1aa] transition-colors">Contact</a>
+            <a href="/terms" className="hover:text-[#a1a1aa] transition-colors">Terms</a>
+            <a href="/privacy" className="hover:text-[#a1a1aa] transition-colors">Privacy</a>
+            <a href="mailto:support@temporead.app" className="hover:text-[#a1a1aa] transition-colors">Contact</a>
           </div>
           <div className="text-[11px] text-[#3f3f46]">&copy; 2026 TempoRead</div>
         </div>

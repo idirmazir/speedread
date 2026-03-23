@@ -688,7 +688,7 @@ export default function Home() {
   useEffect(() => {
     if (!isPlaying || words.length === 0) return
     let cancelled = false
-    const tick = () => {
+    const tick = (extraPause) => {
       if (cancelled) return
       const idx = indexRef.current
       if (idx >= words.length - 1) { setIsPlaying(false); return }
@@ -696,11 +696,11 @@ export default function Home() {
       if (rampSpeed > 0) setWpm(prev => Math.min(maxWpm, prev + rampSpeed * 0.05))
       setCurrentIndex(idx + 1)
       const baseDelay = (60 / wpm) * 1000
-      const w = words[idx]
-      const pause = /[.!?]$/.test(w) ? baseDelay * 1.5 : /[,;:]$/.test(w) ? baseDelay * 0.4 : 0
-      intervalRef.current = setTimeout(tick, baseDelay + pause)
+      // Pause carries over to the next tick, so the punctuated word stays on screen longer
+      const nextPause = /[.!?]$/.test(words[idx]) ? baseDelay * 1.5 : /[,;:]$/.test(words[idx]) ? baseDelay * 0.4 : 0
+      intervalRef.current = setTimeout(() => tick(nextPause), baseDelay + (extraPause || 0))
     }
-    intervalRef.current = setTimeout(tick, (60 / wpm) * 1000)
+    intervalRef.current = setTimeout(() => tick(0), (60 / wpm) * 1000)
     return () => { cancelled = true; clearTimeout(intervalRef.current) }
   }, [isPlaying, wpm, words.length, rampSpeed, maxWpm])
 
