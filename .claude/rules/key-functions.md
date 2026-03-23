@@ -1,4 +1,4 @@
-# FlashRead Key Functions (src/app/app/page.js)
+# TempoRead Key Functions (src/app/app/page.js)
 
 | Function | Purpose |
 |----------|---------|

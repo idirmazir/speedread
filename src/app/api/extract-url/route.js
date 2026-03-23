@@ -21,7 +21,7 @@ export async function POST(request) {
 
     const article = await extract(parsed.href, {}, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; FlashRead/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; TempoRead/1.0)',
       },
       signal: AbortSignal.timeout(15000),
     })

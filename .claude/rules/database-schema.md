@@ -1,4 +1,4 @@
-# FlashRead Database Schema (Supabase)
+# TempoRead Database Schema (Supabase)
 
 ## profiles
 ```sql

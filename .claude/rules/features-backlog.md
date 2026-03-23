@@ -1,8 +1,9 @@
-# FlashRead Features & Backlog
+# TempoRead Features & Backlog
 
 ## Built & Working
 - RSVP engine with ORP focal letter (configurable color, pixel-perfect via useLayoutEffect)
 - Variable speed (100–1000 WPM) via custom pointer-event sliders, speed ramping
+- Sentence pause (50% longer delay after `.` `!` `?`)
 - Font size adjustment (XS–XXL), keyboard shortcuts (Space, arrows, R, brackets)
 - PDF upload (server-side pdf-parse-new), DOCX (client mammoth), TXT, paste text, URL import (Pro)
 - Supabase auth (email/password), document library, progress tracking, auto-save every 10s
@@ -13,15 +14,17 @@
 - 6+ fonts (System, Georgia, Literata, JetBrains Mono, Atkinson Hyperlegible, OpenDyslexic)
 - Text context sidebar, toast system, confirm modals, onboarding banner
 - Landing page with live RSVP demo, feature grid, pricing section
+- Loading skeleton (`loading.js`) for instant /app page feedback
 
 ## Must Do Before Charging Users
-1. Deploy Stripe integration (code exists, not deployed)
-2. Connect flashread.com.au domain to Vercel
-3. Set up support@flashread.com.au email forwarding
-4. Build Terms of Service and Privacy Policy pages
-5. ~~Fix theme localStorage key~~ — app/page.js already uses `fr-prefs`. Delete orphaned `src/app/components/theme-settings.jsx` (still uses old key, not imported anywhere)
-6. Remove legacy packages from package.json (pdf-poppler, pdf2pic, react-pdf, unpdf)
-7. Remove legacy `src/lib/supabase.js` (old non-SSR client, use `supabase-client.js`)
+1. Build Stripe integration
+2. Build Terms of Service and Privacy Policy pages
+
+## Done (Cleanup)
+- ~~Fix theme localStorage key~~ — uses `tr-prefs`
+- ~~Delete orphaned theme-settings.jsx~~ — done
+- ~~Remove legacy packages~~ — done
+- ~~Remove legacy supabase.js~~ — done
 
 ## Feature Backlog (Not Built)
 - AI document tools (summarization, flashcards, key concepts) — Pro+ tier

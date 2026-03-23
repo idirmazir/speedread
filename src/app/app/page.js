@@ -195,7 +195,7 @@ function OnboardingBanner({ onLoadSample, onDismiss, theme }) {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold tracking-tight mb-1" style={{ color: t.text }}>Welcome to FlashRead</h3>
+          <h3 className="text-[14px] font-semibold tracking-tight mb-1" style={{ color: t.text }}>Welcome to TempoRead</h3>
           <p className="text-[12px] leading-relaxed mb-3.5" style={{ color: t.textMuted }}>
             Words appear one at a time, right where your eyes are focused. No scanning, no re-reading – just pure comprehension at 2-3x your normal speed.
           </p>
@@ -469,8 +469,8 @@ export default function Home() {
   const fc = focalColor === 'theme' ? t.accent : focalColor
 
   // Persist prefs
-  useEffect(() => { try { const s = localStorage.getItem('fr-prefs'); if (s) { const p = JSON.parse(s); if (p.t && THEMES[p.t]) setThemeKey(p.t); if (p.f && FONTS[p.f]) setFontKey(p.f); if (p.fc) setFocalColor(p.fc) } } catch {} }, [])
-  useEffect(() => { try { localStorage.setItem('fr-prefs', JSON.stringify({ t: themeKey, f: fontKey, fc: focalColor })) } catch {} }, [themeKey, fontKey, focalColor])
+  useEffect(() => { try { const s = localStorage.getItem('tr-prefs'); if (s) { const p = JSON.parse(s); if (p.t && THEMES[p.t]) setThemeKey(p.t); if (p.f && FONTS[p.f]) setFontKey(p.f); if (p.fc) setFocalColor(p.fc) } } catch {} }, [])
+  useEffect(() => { try { localStorage.setItem('tr-prefs', JSON.stringify({ t: themeKey, f: fontKey, fc: focalColor })) } catch {} }, [themeKey, fontKey, focalColor])
   useEffect(() => { const fn = FONTS[fontKey]; if (!fn) return; if (fn.gf) { const id = `gf-${fontKey}`; if (!document.getElementById(id)) { const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = `https://fonts.googleapis.com/css2?family=${fn.gf}&display=swap`; document.head.appendChild(l) } } if (fn.cdn) { const id = `cf-${fontKey}`; if (!document.getElementById(id)) { const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = fn.cdn; document.head.appendChild(l) } } }, [fontKey])
 
 
@@ -530,6 +530,14 @@ export default function Home() {
     setLoading(false)
   }
 
+  const handleGoogleAuth = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/app` },
+    })
+    if (error) addToast(error.message, 'error')
+  }
+
   const handleSignOut = async () => { await supabase.auth.signOut(); setDocuments([]); setCurrentDocId(null); setReadingSessions([]); addToast('Signed out', 'info') }
 
   const saveDocument = async () => {
@@ -542,7 +550,17 @@ export default function Home() {
     setSavingDoc(false); loadDocuments()
   }
 
-  const loadDocument = (doc) => { setText(doc.content); setDocTitle(doc.title); setCurrentDocId(doc.id); setCurrentIndex(doc.current_position || 0); setShowOnboarding(false); addToast(`Loaded "${doc.title}"`, 'info') }
+  const loadDocument = (doc) => {
+    setText(doc.content); setDocTitle(doc.title); setCurrentDocId(doc.id)
+    const pos = doc.current_position || 0
+    setCurrentIndex(pos); setShowOnboarding(false)
+    if (pos > 0 && doc.total_words > 0) {
+      const pct = Math.round((pos / doc.total_words) * 100)
+      addToast(`Resuming "${doc.title}" — ${pct}% complete`, 'success')
+    } else {
+      addToast(`Loaded "${doc.title}"`, 'info')
+    }
+  }
 
   // Delete with confirmation
   const requestDelete = (id, title) => setConfirmModal({ isOpen: true, docId: id, docTitle: title })
@@ -590,11 +608,11 @@ export default function Home() {
     setShowRecall(false)
     hasShownEndRecallRef.current = false
     // If doc was finished (position at end), restart from beginning
-    if (currentIndex >= pw.length - 1) setCurrentIndex(0)
+    if (currentIndex >= parsedWords.length - 1) setCurrentIndex(0)
     sessionStartRef.current = Date.now()
-    sessionWordsStartRef.current = currentIndex >= pw.length - 1 ? 0 : currentIndex
+    sessionWordsStartRef.current = currentIndex >= parsedWords.length - 1 ? 0 : currentIndex
     wpmSamplesRef.current = []
-    lastRecallIndexRef.current = currentIndex >= pw.length - 1 ? 0 : currentIndex
+    lastRecallIndexRef.current = currentIndex >= parsedWords.length - 1 ? 0 : currentIndex
     if (user) saveDocument()
   }
 
@@ -628,19 +646,26 @@ export default function Home() {
     setImportingUrl(false)
   }
 
-  // ── Playback interval: samples WPM for analytics ──
+  // ── Playback loop: per-word timeout with sentence pause ──
+  const indexRef = useRef(0)
+  useEffect(() => { indexRef.current = currentIndex }, [currentIndex])
   useEffect(() => {
-    if (isPlaying && words.length > 0) {
-      intervalRef.current = setInterval(() => {
-        setCurrentIndex(p => {
-          if (p >= words.length - 1) { setIsPlaying(false); return p }
-          return p + 1
-        })
-        wpmSamplesRef.current.push(wpm)
-        if (rampSpeed > 0) setWpm(p => Math.min(maxWpm, p + rampSpeed * 0.05))
-      }, (60 / wpm) * 1000)
+    if (!isPlaying || words.length === 0) return
+    let cancelled = false
+    const tick = () => {
+      if (cancelled) return
+      const idx = indexRef.current
+      if (idx >= words.length - 1) { setIsPlaying(false); return }
+      wpmSamplesRef.current.push(wpm)
+      if (rampSpeed > 0) setWpm(prev => Math.min(maxWpm, prev + rampSpeed * 0.05))
+      setCurrentIndex(idx + 1)
+      const baseDelay = (60 / wpm) * 1000
+      const w = words[idx]
+      const pause = /[.!?]$/.test(w) ? baseDelay * 1.5 : /[,;:]$/.test(w) ? baseDelay * 0.4 : 0
+      intervalRef.current = setTimeout(tick, baseDelay + pause)
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+    intervalRef.current = setTimeout(tick, (60 / wpm) * 1000)
+    return () => { cancelled = true; clearTimeout(intervalRef.current) }
   }, [isPlaying, wpm, words.length, rampSpeed, maxWpm])
 
   // ── Recall interval checkpoint: watches currentIndex during playback ──
@@ -854,14 +879,7 @@ export default function Home() {
   )
 
   // ═══════════════════════════ LOADING ═══════════════════════════
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: t.bg }}>
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative w-10 h-10"><div className="absolute inset-0 rounded-full border-2" style={{ borderColor: t.border }} /><div className="absolute inset-0 rounded-full border-2 animate-spin" style={{ borderColor: t.accent, borderTopColor: 'transparent' }} /></div>
-        <div className="text-[10px] tracking-[0.2em] uppercase" style={{ color: t.textFaint }}>Loading</div>
-      </div>
-    </div>
-  )
+  // Auth resolves in background — app renders immediately for non-auth views
 
   // ═══════════════════════════ AUTH ═══════════════════════════
   if (showAuth) return (
@@ -870,18 +888,24 @@ export default function Home() {
       <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] pointer-events-none" style={{ backgroundColor: t.accentGlow }} />
       <div className="relative backdrop-blur-2xl rounded-2xl p-9 w-full max-w-[360px] shadow-2xl" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
         <div className="text-center mb-9">
-          <h1 className="text-[28px] tracking-tight mb-1"><span className="font-light" style={{ color: t.text }}>Flash</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
+          <h1 className="text-[28px] tracking-tight mb-1"><span className="font-light" style={{ color: t.text }}>Tempo</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
           <p className="text-[13px]" style={{ color: t.textMuted }}>{isSignUp ? 'Create your account' : 'Welcome back'}</p>
         </div>
         <form onSubmit={handleAuth} className="space-y-2.5">
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl text-[13px] focus:outline-none transition-all" style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.text, caretColor: t.accent }} required />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl text-[13px] focus:outline-none transition-all" style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.text, caretColor: t.accent }} required />
-          <button type="submit" disabled={loading} className="w-full py-3 rounded-xl font-semibold text-[13px] transition-all shadow-lg mt-1" style={{ backgroundColor: t.accent, color: t.btnText }}>{loading ? '...' : (isSignUp ? 'Create Account' : 'Sign In')}</button>
+          <button type="submit" className="w-full py-3 rounded-xl font-semibold text-[13px] transition-all shadow-lg mt-1" style={{ backgroundColor: t.accent, color: t.btnText }}>{isSignUp ? 'Create Account' : 'Sign In'}</button>
         </form>
-        <div className="mt-7 text-center space-y-3">
+        <div className="mt-5">
+          <div className="flex items-center gap-4 mb-4"><div className="flex-1 h-px" style={{ backgroundColor: t.border }} /><span className="text-[10px] tracking-[0.15em] uppercase" style={{ color: t.textFaint }}>or</span><div className="flex-1 h-px" style={{ backgroundColor: t.border }} /></div>
+          <button onClick={handleGoogleAuth} className="w-full py-3 rounded-xl text-[13px] font-medium transition-all hover:opacity-90 flex items-center justify-center gap-3" style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.text }}>
+            <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Continue with Google
+          </button>
+        </div>
+        <div className="mt-5 text-center space-y-3">
           <button onClick={() => setIsSignUp(!isSignUp)} className="text-[12px] transition-colors hover:opacity-80" style={{ color: t.textMuted }}>{isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}</button>
-          <div className="flex items-center gap-4"><div className="flex-1 h-px" style={{ backgroundColor: t.border }} /><span className="text-[10px] tracking-[0.15em] uppercase" style={{ color: t.textFaint }}>or</span><div className="flex-1 h-px" style={{ backgroundColor: t.border }} /></div>
-          <button onClick={() => setShowAuth(false)} className="text-[12px] transition-colors hover:opacity-80" style={{ color: t.textFaint }}>Continue without account</button>
+          <button onClick={() => setShowAuth(false)} className="block w-full text-[12px] transition-colors hover:opacity-80" style={{ color: t.textFaint }}>Continue without account</button>
         </div>
       </div>
     </div>
@@ -964,7 +988,7 @@ export default function Home() {
         {/* Header */}
         <header className="flex items-center justify-between mb-8 md:mb-12">
           <div>
-            <h1 className="text-[28px] tracking-tight mb-0.5"><span className="font-light" style={{ color: t.text }}>Flash</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
+            <h1 className="text-[28px] tracking-tight mb-0.5"><span className="font-light" style={{ color: t.text }}>Tempo</span><span className="font-semibold" style={{ color: t.accent }}>Read</span></h1>
             <p className="text-[10px] tracking-[0.15em] uppercase" style={{ color: t.textFaint }}>RSVP Speed Reading</p>
           </div>
           <div className="flex items-center gap-2.5">
@@ -985,47 +1009,6 @@ export default function Home() {
 
         {/* Onboarding */}
         {showOnboarding && !text && <OnboardingBanner onLoadSample={loadSampleText} onDismiss={() => setShowOnboarding(false)} theme={t} />}
-
-        {/* Analytics Dashboard — Pro only */}
-        {user && isPro && readingSessions.length > 0 && (
-          <AnalyticsDashboard sessions={readingSessions} theme={t} />
-        )}
-
-        {/* Library */}
-        {user && isPro && (
-          <section className="mb-8 md:mb-12">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: t.text }}>Library</h2>
-              {documents.length > 0 && <span className="text-[11px]" style={{ color: t.textFaint }}>{documents.length} doc{documents.length !== 1 ? 's' : ''}</span>}
-            </div>
-            {loadingDocs ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="flex items-center gap-3"><div className="relative w-5 h-5"><div className="absolute inset-0 rounded-full border-2 animate-spin" style={{ borderColor: t.accent, borderTopColor: 'transparent' }} /></div><span className="text-[12px]" style={{ color: t.textFaint }}>Loading library...</span></div>
-              </div>
-            ) : documents.length === 0 ? (
-              <EmptyLibrary theme={t} />
-            ) : (
-              <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
-                {documents.map((doc) => {
-                  const dp = doc.current_position > 0 ? Math.round((doc.current_position / doc.total_words) * 100) : 0
-                  return (
-                    <div key={doc.id} className="group rounded-xl p-4 transition-all duration-200 hover:scale-[1.01]" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-[13px] truncate mr-2" style={{ color: t.text }}>{doc.title}</h3>
-                        <button onClick={(e) => { e.stopPropagation(); requestDelete(doc.id, doc.title) }} className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded flex items-center justify-center transition-all hover:opacity-70" style={{ color: t.textFaint }}>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </div>
-                      <div className="text-[11px] mb-2.5" style={{ color: t.textFaint }}>{doc.word_count?.toLocaleString()} words · {dp > 0 ? `${dp}%` : 'New'}</div>
-                      {dp > 0 && <div className="w-full rounded-full h-[3px] mb-3" style={{ backgroundColor: t.border }}><div className="h-full rounded-full" style={{ width: `${Math.min(dp, 100)}%`, backgroundColor: t.progress, opacity: 0.6 }} /></div>}
-                      <button onClick={() => loadDocument(doc)} className="w-full py-[7px] rounded-lg text-[11px] font-semibold tracking-wide transition-all hover:opacity-80" style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.textMuted }}>{dp > 0 ? 'Continue' : 'Read'}</button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-        )}
 
         {/* Input */}
         <section className="grid lg:grid-cols-2 gap-5 mb-8">
@@ -1110,6 +1093,47 @@ export default function Home() {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Library */}
+        {user && isPro && (
+          <section className="mb-8 md:mb-12">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: t.text }}>Library</h2>
+              {documents.length > 0 && <span className="text-[11px]" style={{ color: t.textFaint }}>{documents.length} doc{documents.length !== 1 ? 's' : ''}</span>}
+            </div>
+            {loadingDocs ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center gap-3"><div className="relative w-5 h-5"><div className="absolute inset-0 rounded-full border-2 animate-spin" style={{ borderColor: t.accent, borderTopColor: 'transparent' }} /></div><span className="text-[12px]" style={{ color: t.textFaint }}>Loading library...</span></div>
+              </div>
+            ) : documents.length === 0 ? (
+              <EmptyLibrary theme={t} />
+            ) : (
+              <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
+                {documents.map((doc) => {
+                  const dp = doc.current_position > 0 ? Math.round((doc.current_position / doc.total_words) * 100) : 0
+                  return (
+                    <div key={doc.id} className="group rounded-xl p-4 transition-all duration-200 hover:scale-[1.01]" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }}>
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-[13px] truncate mr-2" style={{ color: t.text }}>{doc.title}</h3>
+                        <button onClick={(e) => { e.stopPropagation(); requestDelete(doc.id, doc.title) }} className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded flex items-center justify-center transition-all hover:opacity-70" style={{ color: t.textFaint }}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
+                      <div className="text-[11px] mb-2.5" style={{ color: t.textFaint }}>{doc.word_count?.toLocaleString()} words · {dp > 0 ? `${dp}%` : 'New'}</div>
+                      {dp > 0 && <div className="w-full rounded-full h-[3px] mb-3" style={{ backgroundColor: t.border }}><div className="h-full rounded-full" style={{ width: `${Math.min(dp, 100)}%`, backgroundColor: t.progress, opacity: 0.6 }} /></div>}
+                      <button onClick={() => loadDocument(doc)} className="w-full py-[7px] rounded-lg text-[11px] font-semibold tracking-wide transition-all hover:opacity-80" style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.textMuted }}>{dp > 0 ? 'Continue' : 'Read'}</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Analytics Dashboard — Pro only */}
+        {user && isPro && readingSessions.length > 0 && (
+          <AnalyticsDashboard sessions={readingSessions} theme={t} />
         )}
 
         {!text && !(user && isPro && documents.length > 0) && !showOnboarding && (

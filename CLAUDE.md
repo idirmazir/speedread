@@ -1,28 +1,26 @@
-# FlashRead
+# TempoRead
 
 RSVP speed reading web app for university students. Built with Next.js 16, Supabase, Tailwind v4. Deployed on Vercel.
 
 **Owner:** Idir (Perth, Australia)
-**Domain:** flashread.com.au (pending Vercel connection)
-**Live:** speedread-five.vercel.app (legacy URL → to become flashread.vercel.app)
+**Live:** speedread-five.vercel.app (legacy URL)
 
 ## Brand — ZERO TOLERANCE
 
-Brand is **FlashRead**. Never use "SpeedRead", "Requiem", `sr-prefs`, or `rq-prefs`.
-- localStorage prefix: `fr-prefs`
-- Logo: "Flash" (font-light) + "Read" (accent color, font-semibold)
+Brand is **TempoRead**. Never use "FlashRead", "SpeedRead", "Requiem", `sr-prefs`, `rq-prefs`, or `fr-prefs`.
+- localStorage prefix: `tr-prefs`
+- Logo: "Tempo" (font-light) + "Read" (accent color, font-semibold)
 
 ## Routing — READ CAREFULLY
 
 ```
 src/app/page.js                    → LANDING PAGE at /
 src/app/app/page.js                → MAIN APP at /app    → 90% of dev happens here
-src/app/components/theme-settings.jsx → Legacy theme component (NOT imported by app — ThemePanel is inline in app/page.js)
+src/app/app/loading.js             → Loading skeleton for /app
 src/app/api/extract-pdf/route.js   → PDF extraction endpoint
 src/app/api/extract-url/route.js   → URL article extraction endpoint
 src/app/layout.js                  → Root layout
 src/lib/supabase-client.js         → Browser Supabase client (SSR, use this)
-src/lib/supabase.js                → Old non-SSR client (legacy, unused — do not use)
 ```
 
 The app page import path is `../../lib/supabase-client` (two levels up from `src/app/app/`).
@@ -75,6 +73,5 @@ git commit --allow-empty -m "trigger rebuild" && git push  # Force Vercel redepl
 
 ## Current State
 
-Stripe integration code written but NOT deployed. Landing page pricing updated to $5/$35.
-`app/page.js` already uses `fr-prefs` localStorage key. BUT `src/app/components/theme-settings.jsx` is an orphaned legacy component that still uses `speedread-theme-settings` — nothing imports it, safe to delete.
-Legacy packages (pdf-poppler, pdf2pic, react-pdf, unpdf) still in package.json — safe to remove.
+Stripe integration not yet built. Legacy packages and orphaned files cleaned up.
+`app/page.js` uses `tr-prefs` localStorage key.
