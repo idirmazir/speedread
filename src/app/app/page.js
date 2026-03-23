@@ -478,6 +478,15 @@ export default function Home() {
   useEffect(() => { const g = async () => { const { data: { session } } = await supabase.auth.getSession(); setUser(session?.user ?? null); setLoading(false) }; g(); const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => { setUser(s?.user ?? null); setLoading(false) }); return () => subscription.unsubscribe() }, [])
   useEffect(() => { if (user) { loadDocuments(); loadProfile(); loadReadingSessions() } }, [user])
 
+  // Upgraded success check
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('upgraded') === 'true') {
+      addToast('Welcome to Pro! All features are now unlocked.', 'success')
+      window.history.replaceState({}, '', '/app')
+    }
+  }, [])
+
   // Onboarding check
   useEffect(() => {
     if (!loading && !text && !showReader) {
@@ -539,6 +548,33 @@ export default function Home() {
   }
 
   const handleSignOut = async () => { await supabase.auth.signOut(); setDocuments([]); setCurrentDocId(null); setReadingSessions([]); addToast('Signed out', 'info') }
+
+  const handleUpgrade = async (plan) => {
+    if (!user) { setShowAuth(true); setShowUpgradeModal(false); return }
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, userId: user.id, email: user.email }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else addToast(data.error || 'Failed to start checkout', 'error')
+    } catch { addToast('Something went wrong. Please try again.', 'error') }
+  }
+
+  const handleManageSubscription = async () => {
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else addToast(data.error || 'Failed to open portal', 'error')
+    } catch { addToast('Something went wrong. Please try again.', 'error') }
+  }
 
   const saveDocument = async () => {
     if (!user || !text.trim()) return; setSavingDoc(true)
@@ -994,6 +1030,7 @@ export default function Home() {
           <div className="flex items-center gap-2.5">
             {user ? (<>
               {!isPro && <button onClick={() => { setUpgradeReason('general'); setShowUpgradeModal(true) }} className="px-3.5 py-[7px] rounded-lg text-[11px] font-semibold tracking-wide transition-all hover:opacity-90" style={{ backgroundColor: t.accentGlow, border: `1px solid ${t.accent}30`, color: t.accent }}>Upgrade</button>}
+              {isPro && <button onClick={handleManageSubscription} className="px-3 py-[7px] rounded-lg text-[11px] transition-all hover:opacity-80" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>Manage Plan</button>}
               <div className="text-right mr-1 hidden sm:block">
                 <div className="text-[13px] font-medium" style={{ color: t.text }}>{user.email}</div>
                 <div className="text-[10px] tracking-wide font-semibold" style={{ color: isPro ? t.accent : t.textFaint }}>{isPro ? 'Pro' : 'Free'}</div>
@@ -1155,8 +1192,15 @@ export default function Home() {
             <div className="rounded-lg p-3.5 mb-4" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
               <div className="space-y-1.5">{['PDF & DOCX uploads', 'URL import', 'Unlimited words', 'Cloud library', 'Auto-save & analytics'].map((x, i) => (<div key={i} className="flex items-center gap-2 text-[12px]"><svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg><span style={{ color: t.text }}>{x}</span></div>))}</div>
             </div>
-            <div className="flex items-baseline gap-1 mb-4"><span className="text-xl font-semibold tabular-nums" style={{ color: t.text }}>$5 AUD</span><span className="text-[12px]" style={{ color: t.textMuted }}>/mo</span><span className="text-[11px] ml-1.5" style={{ color: t.textFaint }}>or $35/yr</span></div>
-            <button onClick={() => setShowUpgradeModal(false)} className="w-full py-2.5 rounded-xl font-semibold text-[13px] shadow-lg transition-all hover:opacity-90 mb-2" style={{ backgroundColor: t.accent, color: t.btnText }}>Upgrade to Pro</button>
+            <div className="flex gap-2 mb-3">
+              <button onClick={() => handleUpgrade('monthly')} className="flex-1 py-2.5 rounded-xl font-semibold text-[13px] shadow-lg transition-all hover:opacity-90" style={{ backgroundColor: t.accent, color: t.btnText }}>
+                $5 AUD/mo
+              </button>
+              <button onClick={() => handleUpgrade('annual')} className="flex-1 py-2.5 rounded-xl font-semibold text-[13px] shadow-lg transition-all hover:opacity-90 relative" style={{ backgroundColor: t.accent, color: t.btnText }}>
+                $35/yr
+                <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: '#f59e0b', color: '#000' }}>Save 42%</span>
+              </button>
+            </div>
             <button onClick={() => setShowUpgradeModal(false)} className="w-full py-2 text-[11px] transition-colors hover:opacity-70" style={{ color: t.textFaint }}>Maybe later</button>
           </div>
         </div>
