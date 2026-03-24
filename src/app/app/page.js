@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '../../lib/supabase-client'
 
 // ═══════════════════════════════════════════════════════
@@ -67,6 +67,294 @@ function ConfirmModal({ isOpen, title, message, onConfirm, onCancel, confirmLabe
 }
 
 // ═══════════════════════════════════════════════════════
+// CAMERA SCAN (Pro OCR) — stable + sharp frame detection → full-res JPEG → OCR
+// ═══════════════════════════════════════════════════════
+const SCAN_ANALYSIS_W = 200
+const SCAN_ANALYSIS_H = 150
+/** Center crop of video (fraction) — ignore edges / hands */
+const PAGE_CROP_FR = 0.72
+/** Mean abs pixel diff between frames / 255; lower = steadier */
+const MOTION_STABLE_MAX = 0.028
+/** Laplacian energy (focus); higher = sharper text */
+const LAPLACIAN_SHARP_MIN = 120
+const STABLE_TICKS_NEEDED = 7
+const SCAN_INTERVAL_MS = 90
+
+function grayFromImageData(imageData) {
+  const d = imageData.data
+  const n = imageData.width * imageData.height
+  const g = new Float32Array(n)
+  for (let i = 0, j = 0; j < n; i += 4, j++) {
+    g[j] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+  }
+  return g
+}
+
+function laplacianMeanEnergy(gray, w, h) {
+  let sum = 0
+  let count = 0
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x
+      const lap = 4 * gray[i] - gray[i - 1] - gray[i + 1] - gray[i - w] - gray[i + w]
+      sum += lap * lap
+      count++
+    }
+  }
+  return count ? sum / count : 0
+}
+
+function meanMotion(prev, gray, n) {
+  if (!prev || prev.length !== n) return 1
+  let s = 0
+  for (let i = 0; i < n; i++) s += Math.abs(gray[i] - prev[i])
+  return s / (n * 255)
+}
+
+function CameraModal({ isOpen, onClose, theme, onPhoto, onError }) {
+  const t = theme
+  const videoRef = useRef(null)
+  const hiddenCanvasRef = useRef(null)
+  const streamRef = useRef(null)
+  const prevGrayRef = useRef(null)
+  const stableTicksRef = useRef(0)
+  const doneRef = useRef(false)
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
+  const onPhotoRef = useRef(onPhoto)
+  onPhotoRef.current = onPhoto
+  const [facing, setFacing] = useState('environment')
+  const [ready, setReady] = useState(false)
+  const [hint, setHint] = useState('')
+  const [lockPct, setLockPct] = useState(0)
+  const [scanning, setScanning] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setReady(false)
+      setHint('')
+      setLockPct(0)
+      setScanning(false)
+      prevGrayRef.current = null
+      stableTicksRef.current = 0
+      doneRef.current = false
+      return
+    }
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      onErrorRef.current?.('Camera is not supported in this browser.')
+      return
+    }
+    let cancelled = false
+    const start = async () => {
+      setReady(false)
+      streamRef.current?.getTracks().forEach((tr) => tr.stop())
+      streamRef.current = null
+      try {
+        const base = { audio: false }
+        const tryConstraints = [
+          { ...base, video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+          { ...base, video: { facingMode: facing } },
+          { ...base, video: true },
+        ]
+        let stream
+        for (const c of tryConstraints) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(c)
+            break
+          } catch {
+            /* try next */
+          }
+        }
+        if (!stream) throw new Error('no stream')
+        if (cancelled) return
+        streamRef.current = stream
+        const el = videoRef.current
+        if (el) {
+          el.srcObject = stream
+          el.onloadedmetadata = () => {
+            if (!cancelled) setReady(true)
+          }
+          await el.play().catch(() => {})
+        }
+      } catch {
+        if (!cancelled) onErrorRef.current?.('Could not access the camera. Allow permission or use HTTPS.')
+      }
+    }
+    start()
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach((tr) => tr.stop())
+      streamRef.current = null
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+  }, [isOpen, facing])
+
+  useEffect(() => {
+    if (!isOpen || !ready) return
+    let iv = null
+    const tick = () => {
+      if (doneRef.current) return
+      const v = videoRef.current
+      let canvas = hiddenCanvasRef.current
+      if (!v || v.readyState < 2 || !canvas) return
+      const vw = v.videoWidth
+      const vh = v.videoHeight
+      if (vw < 8 || vh < 8) return
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+      const cw = SCAN_ANALYSIS_W
+      const ch = SCAN_ANALYSIS_H
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw
+        canvas.height = ch
+      }
+      const cropW = vw * PAGE_CROP_FR
+      const cropH = vh * PAGE_CROP_FR
+      const sx = (vw - cropW) / 2
+      const sy = (vh - cropH) / 2
+      ctx.drawImage(v, sx, sy, cropW, cropH, 0, 0, cw, ch)
+      const imageData = ctx.getImageData(0, 0, cw, ch)
+      const gray = grayFromImageData(imageData)
+      const n = gray.length
+      const motion = meanMotion(prevGrayRef.current, gray, n)
+      const lap = laplacianMeanEnergy(gray, cw, ch)
+      prevGrayRef.current = gray
+
+      let nextHint = ''
+      if (lap < LAPLACIAN_SHARP_MIN * 0.55) {
+        nextHint = 'Move closer — fill the frame with the page. More light helps.'
+      } else if (motion > MOTION_STABLE_MAX * 2.2) {
+        nextHint = 'Hold the page steadier in the green guide.'
+      } else if (lap < LAPLACIAN_SHARP_MIN) {
+        nextHint = 'Almost — hold still so the text comes into focus.'
+      } else if (motion > MOTION_STABLE_MAX) {
+        nextHint = 'A bit steadier…'
+        stableTicksRef.current = 0
+        setLockPct(0)
+      } else {
+        stableTicksRef.current += 1
+        const p = Math.min(100, Math.round((stableTicksRef.current / STABLE_TICKS_NEEDED) * 100))
+        setLockPct(p)
+        nextHint = 'Hold steady — scanning…'
+        if (stableTicksRef.current >= STABLE_TICKS_NEEDED) {
+          doneRef.current = true
+          setScanning(true)
+          setHint('Capturing…')
+          stableTicksRef.current = 0
+          setLockPct(100)
+          const full = document.createElement('canvas')
+          full.width = vw
+          full.height = vh
+          const fctx = full.getContext('2d')
+          if (fctx) {
+            fctx.drawImage(v, 0, 0)
+            full.toBlob(
+              (blob) => {
+                if (blob) onPhotoRef.current(blob)
+                else onErrorRef.current?.('Could not capture frame.')
+                setScanning(false)
+              },
+              'image/jpeg',
+              0.92
+            )
+          } else {
+            setScanning(false)
+            onErrorRef.current?.('Could not capture frame.')
+          }
+          return
+        }
+      }
+      if (nextHint) setHint(nextHint)
+    }
+    iv = setInterval(tick, SCAN_INTERVAL_MS)
+    return () => { if (iv) clearInterval(iv) }
+  }, [isOpen, ready])
+
+  if (!isOpen) return null
+
+  const captureManual = () => {
+    const v = videoRef.current
+    if (!v || v.videoWidth < 2) {
+      onErrorRef.current?.('Camera not ready yet.')
+      return
+    }
+    doneRef.current = true
+    const canvas = document.createElement('canvas')
+    canvas.width = v.videoWidth
+    canvas.height = v.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(v, 0, 0)
+    canvas.toBlob(
+      (blob) => {
+        if (blob) onPhotoRef.current(blob)
+        else onErrorRef.current?.('Could not capture frame.')
+      },
+      'image/jpeg',
+      0.92
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+      <div className="absolute inset-0 backdrop-blur-md" style={{ backgroundColor: t.bg + 'dd' }} onClick={onClose} />
+      <div className="relative rounded-2xl p-5 w-full max-w-lg shadow-2xl" style={{ backgroundColor: t.surface, border: `1px solid ${t.border}` }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: t.text }}>Page scan</h3>
+          <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-70" style={{ color: t.textFaint }} aria-label="Close">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <p className="text-[12px] mb-3 leading-relaxed" style={{ color: t.textMuted }}>Hold the textbook page in the frame. When you stay still and the text is sharp, we capture automatically — or tap manual capture.</p>
+        <div className="rounded-xl overflow-hidden mb-3 aspect-[4/3] bg-black/80 relative">
+          <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
+          <canvas ref={hiddenCanvasRef} className="hidden" aria-hidden />
+          {/* Guide: center area where we analyze */}
+          <div className="absolute inset-[10%] border-2 rounded-lg pointer-events-none transition-colors duration-200" style={{ borderColor: lockPct >= 85 ? t.accent : 'rgba(52,211,153,0.45)', boxShadow: lockPct >= 50 ? `inset 0 0 0 1px ${t.accent}33` : 'none' }} />
+          {ready && (
+            <div className="absolute bottom-0 left-0 right-0 px-3 py-2.5 text-center">
+              <div className="text-[11px] font-medium leading-snug drop-shadow-md" style={{ color: '#fafafa', textShadow: '0 1px 4px rgba(0,0,0,0.9)' }}>
+                {scanning ? 'Capturing…' : hint || 'Fill the frame with text — hold steady'}
+              </div>
+              {!scanning && lockPct > 0 && (
+                <div className="mt-2 h-1 rounded-full overflow-hidden mx-auto max-w-[200px]" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+                  <div className="h-full rounded-full transition-all duration-100" style={{ width: `${lockPct}%`, backgroundColor: t.accent }} />
+                </div>
+              )}
+            </div>
+          )}
+          {!ready && (
+            <div className="absolute inset-0 flex items-center justify-center text-[12px]" style={{ color: t.textFaint }}>Starting camera…</div>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))}
+            className="px-3 py-2 rounded-lg text-[12px] font-medium transition-all hover:opacity-90"
+            style={{ backgroundColor: t.surfaceHover, border: `1px solid ${t.border}`, color: t.textMuted }}
+          >
+            Flip camera
+          </button>
+          <button
+            type="button"
+            onClick={captureManual}
+            disabled={!ready || scanning}
+            className="px-4 py-2 rounded-lg text-[12px] font-semibold transition-all hover:opacity-90 disabled:opacity-40"
+            style={{ backgroundColor: t.accent, color: t.btnText }}
+          >
+            Capture now
+          </button>
+          <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-[12px] font-medium ml-auto" style={{ color: t.textFaint }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════
 // KEYBOARD SHORTCUT OVERLAY
 // ═══════════════════════════════════════════════════════
 function ShortcutOverlay({ isOpen, onClose, theme }) {
@@ -110,10 +398,12 @@ function ShortcutOverlay({ isOpen, onClose, theme }) {
 // RECALL OVERLAY
 // ═══════════════════════════════════════════════════════
 function RecallOverlay({ isOpen, type, recallText, setRecallText, onDone, onSkip, theme }) {
-  if (!isOpen) return null
   const t = theme
   const textareaRef = useRef(null)
-  useEffect(() => { if (isOpen && textareaRef.current) textareaRef.current.focus() }, [isOpen])
+  useEffect(() => {
+    if (isOpen && textareaRef.current) textareaRef.current.focus()
+  }, [isOpen])
+  if (!isOpen) return null
   const isEnd = type === 'end'
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-6">
@@ -233,47 +523,63 @@ function EmptyLibrary({ theme }) {
 function AnalyticsDashboard({ sessions, theme }) {
   const t = theme
 
-  const totalWordsRead = sessions.reduce((sum, s) => sum + (s.words_read || 0), 0)
-  const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0) / 60
-  const avgWpm = sessions.length > 0
-    ? Math.round(sessions.reduce((sum, s) => sum + (s.avg_wpm || 0), 0) / sessions.length)
-    : 0
+  const {
+    totalWordsRead,
+    totalMinutes,
+    avgWpm,
+    streak,
+    last7,
+    maxWords,
+    recentSessions,
+  } = useMemo(() => {
+    const totalWordsRead = sessions.reduce((sum, s) => sum + (s.words_read || 0), 0)
+    const totalMinutes = sessions.reduce((sum, s) => sum + (s.duration_seconds || 0), 0) / 60
+    const avgWpm = sessions.length > 0
+      ? Math.round(sessions.reduce((sum, s) => sum + (s.avg_wpm || 0), 0) / sessions.length)
+      : 0
 
-  // Streak: count consecutive days with sessions
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const sessionDays = new Set(sessions.map(s => {
-    const d = new Date(s.created_at)
-    d.setHours(0, 0, 0, 0)
-    return d.getTime()
-  }))
-  let streak = 0
-  const checkDate = new Date(today)
-  while (sessionDays.has(checkDate.getTime())) {
-    streak++
-    checkDate.setDate(checkDate.getDate() - 1)
-  }
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const sessionDays = new Set(sessions.map(s => {
+      const d = new Date(s.created_at)
+      d.setHours(0, 0, 0, 0)
+      return d.getTime()
+    }))
+    let streak = 0
+    const checkDate = new Date(today)
+    while (sessionDays.has(checkDate.getTime())) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
 
-  // Last 7 days bar chart
-  const last7 = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    d.setHours(0, 0, 0, 0)
-    const dayEnd = new Date(d)
-    dayEnd.setDate(dayEnd.getDate() + 1)
-    const daySessions = sessions.filter(s => {
-      const sd = new Date(s.created_at)
-      return sd >= d && sd < dayEnd
-    })
-    const words = daySessions.reduce((sum, s) => sum + (s.words_read || 0), 0)
+    const last7 = []
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    last7.push({ day: dayNames[d.getDay()], words })
-  }
-  const maxWords = Math.max(...last7.map(d => d.words), 1)
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      d.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(d)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+      const daySessions = sessions.filter(s => {
+        const sd = new Date(s.created_at)
+        return sd >= d && sd < dayEnd
+      })
+      const words = daySessions.reduce((sum, s) => sum + (s.words_read || 0), 0)
+      last7.push({ day: dayNames[d.getDay()], words })
+    }
+    const maxWords = Math.max(...last7.map(d => d.words), 1)
+    const recentSessions = sessions.slice(0, 10).reverse()
 
-  // WPM trend (last 10 sessions, oldest first for left-to-right)
-  const recentSessions = sessions.slice(0, 10).reverse()
+    return {
+      totalWordsRead,
+      totalMinutes,
+      avgWpm,
+      streak,
+      last7,
+      maxWords,
+      recentSessions,
+    }
+  }, [sessions])
 
   return (
     <section className="mb-8 md:mb-12">
@@ -366,7 +672,16 @@ const FSC = { 1: 'text-3xl md:text-4xl', 2: 'text-4xl md:text-5xl', 3: 'text-5xl
 const FSL = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: 'XXL' }
 
 const calculateORP = (w) => { const l = w.length; if (l <= 2) return 0; if (l <= 5) return 1; if (l <= 9) return 2; if (l <= 13) return 3; return Math.floor(l * 0.3) }
-const parseText = (x) => x.replace(/\s+/g, ' ').trim().split(' ').filter(w => w.length > 0)
+
+/** RSVP: one word at a time; WPM = words per minute ⇒ ms visible per word = 60000 / WPM. */
+const msForWpm = (wpm) => 60000 / Math.max(1, wpm)
+/** Fixed breath after a sentence ends (token ends with . ! ?), on top of normal word time. */
+const SENTENCE_PAUSE_MS = 95
+const parseText = (x) => {
+  // Clean up whitespace before punctuation (e.g. "word ," → "word,")
+  const cleaned = x.replace(/\s+([.,;:!?])/g, '$1').replace(/\s+/g, ' ').trim()
+  return cleaned.split(' ').filter(w => w.length > 0 && !/^[.,;:!?]+$/.test(w))
+}
 
 const THEMES = {
   emerald:   { name: 'Emerald',   label: 'Default',   bg: '#09090b', surface: '#18181b', surfaceHover: '#27272a', border: '#27272a', borderLight: '#3f3f46', text: '#e4e4e7', textMuted: '#71717a', textFaint: '#52525b', accent: '#34d399', accentHover: '#6ee7b7', accentGlow: 'rgba(52,211,153,0.07)', progress: '#10b981', btnText: '#000000' },
@@ -394,6 +709,65 @@ const FOCAL_COLORS = [
   { key: '#a855f7', label: 'Purple', c: '#a855f7' },
   { key: '#ec4899', label: 'Pink', c: '#ec4899' },
 ]
+
+function Slider({ value, min, max, step, onChange, label, format, theme }) {
+  const t = theme
+  const trackRef = useRef(null)
+  const [dragVal, setDragVal] = useState(null)
+  const isDragging = dragVal !== null
+  const display = isDragging ? dragVal : value
+  const pct = ((display - min) / (max - min)) * 100
+  const snap = (v) => Math.min(max, Math.max(min, Math.round((v - min) / step) * step + min))
+  const valFromX = useCallback((clientX) => {
+    const rect = trackRef.current.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    return min + ratio * (max - min)
+  }, [min, max])
+  useEffect(() => {
+    if (!isDragging) return
+    const onMove = (e) => {
+      const x = e.touches ? e.touches[0].clientX : e.clientX
+      setDragVal(snap(valFromX(x)))
+    }
+    const onUp = (e) => {
+      const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX
+      const final = snap(valFromX(x))
+      setDragVal(null)
+      onChange(final)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [isDragging, min, max, step, valFromX, onChange])
+  const onStart = (e) => {
+    e.preventDefault()
+    const x = e.touches ? e.touches[0].clientX : e.clientX
+    const snapped = snap(valFromX(x))
+    setDragVal(snapped)
+    onChange(snapped)
+  }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px]" style={{ color: t.textFaint }}>{label}</span>
+        <span className="text-[11px] font-semibold tabular-nums" style={{ color: t.accent }}>{format(display)}</span>
+      </div>
+      <div ref={trackRef} className="relative w-full h-8 flex items-center cursor-pointer select-none touch-none"
+        onMouseDown={onStart} onTouchStart={onStart}>
+        <div className="absolute inset-x-0 h-[5px] rounded-full" style={{ backgroundColor: t.border }} />
+        <div className="absolute left-0 h-[5px] rounded-full" style={{ width: `${pct}%`, backgroundColor: t.accent, opacity: 0.7 }} />
+        <div className="absolute h-5 w-5 rounded-full shadow-lg" style={{ left: `calc(${pct}% - 10px)`, backgroundColor: t.accent, boxShadow: `0 0 0 3px ${t.surface}, 0 2px 8px rgba(0,0,0,0.3)`, transform: isDragging ? 'scale(1.15)' : 'scale(1)', transition: isDragging ? 'transform 0.1s' : 'all 0.15s' }} />
+      </div>
+    </div>
+  )
+}
 
 // ═══════════════════════════════════════════════════════
 // MAIN APP
@@ -431,6 +805,7 @@ export default function Home() {
   const toastIdRef = useRef(0)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, docId: null, docTitle: '' })
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [savingDoc, setSavingDoc] = useState(false)
   const [loadingDocs, setLoadingDocs] = useState(false)
@@ -453,7 +828,7 @@ export default function Home() {
   const wpmSamplesRef = useRef([])
 
   const intervalRef = useRef(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const parsedWords = useMemo(() => parseText(text), [text])
 
   // Toast helpers
@@ -608,14 +983,41 @@ export default function Home() {
   }
   const cancelDelete = () => setConfirmModal({ isOpen: false, docId: null, docTitle: '' })
 
-  // Reading
+  // Reading — shared OCR path for file upload + camera
+  const runImageOcr = async (file) => {
+    setUploadProgress(25)
+    const fd = new FormData()
+    fd.append('file', file)
+    setUploadProgress(40)
+    const res = await fetch('/api/extract-image', { method: 'POST', body: fd })
+    setUploadProgress(75)
+    const r = await res.json()
+    if (res.ok && r.text?.trim()) {
+      setText(r.text.trim())
+      setDocTitle(r.filename || 'Camera')
+      setShowOnboarding(false)
+      setUploadProgress(100)
+      setShowUploadSuccess(true)
+      addToast(`Text from image – ${(r.wordCount ?? r.text.split(/\s+/).length).toLocaleString()} words`, 'success')
+      setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000)
+    } else {
+      addToast(r.error || 'Could not read text from image', 'error')
+      setUploadProgress(0)
+    }
+  }
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return
     if (file.size > 10 * 1024 * 1024) { addToast('File too large – max 10MB.', 'error'); e.target.value = ''; return }
     const pdf = file.type === 'application/pdf' || file.name.endsWith('.pdf')
     const docx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')
-    if ((pdf || docx) && !isPro) { setUpgradeReason('pdf'); setShowUpgradeModal(true); e.target.value = ''; return }
+    const isImage = /^image\/(png|jpeg|jpg|webp|gif)$/i.test(file.type || '') || /\.(png|jpe?g|webp|gif)$/i.test(file.name || '')
+    if ((pdf || docx || isImage) && !isPro) {
+      setUpgradeReason(isImage ? 'image' : 'pdf')
+      setShowUpgradeModal(true)
+      e.target.value = ''
+      return
+    }
     setUploadProgress(10)
     try {
       if (pdf) {
@@ -628,11 +1030,42 @@ export default function Home() {
         const r = await m.extractRawText({ arrayBuffer: ab })
         if (r.value?.trim()) { setText(r.value.trim()); setDocTitle(file.name.replace('.docx', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`DOCX loaded – ${r.value.trim().split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000) }
         else throw new Error('empty')
+      } else if (isImage) {
+        await runImageOcr(file)
       } else if (file.type === 'text/plain') {
         setUploadProgress(60); const tx = await file.text(); setText(tx); setDocTitle(file.name.replace('.txt', '')); setShowOnboarding(false); setUploadProgress(100); setShowUploadSuccess(true); addToast(`File loaded – ${tx.split(/\s+/).length.toLocaleString()} words`, 'success'); setTimeout(() => { setShowUploadSuccess(false); setUploadProgress(0) }, 2000)
-      } else { addToast('Unsupported file type. Use PDF, DOCX, or TXT.', 'error'); setUploadProgress(0) }
-    } catch { addToast('Unable to process file. It may be image-based, protected, or corrupted.', 'error'); setUploadProgress(0) }
+      } else { addToast('Unsupported file type. Use PDF, DOCX, image, or TXT.', 'error'); setUploadProgress(0) }
+    } catch { addToast('Unable to process file. It may be unclear, protected, or corrupted.', 'error'); setUploadProgress(0) }
     e.target.value = ''
+  }
+
+  const handleCameraPhoto = async (blob) => {
+    setShowCamera(false)
+    if (blob.size > 10 * 1024 * 1024) {
+      addToast('Image too large – max 10MB.', 'error')
+      return
+    }
+    try {
+      const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' })
+      await runImageOcr(file)
+    } catch {
+      addToast('Unable to process image.', 'error')
+      setUploadProgress(0)
+    }
+  }
+
+  const handleCameraError = (msg) => {
+    addToast(msg, 'error')
+    setShowCamera(false)
+  }
+
+  const openCamera = () => {
+    if (!isPro) {
+      setUpgradeReason('image')
+      setShowUpgradeModal(true)
+      return
+    }
+    setShowCamera(true)
   }
 
   // ── Start reading: now begins a session ──
@@ -682,27 +1115,51 @@ export default function Home() {
     setImportingUrl(false)
   }
 
-  // ── Playback loop: per-word timeout with sentence pause ──
+  // ── RSVP playback: ms/word = 60000/WPM; ref must advance in the timer (useEffect runs too late) ──
   const indexRef = useRef(0)
+  const wpmRef = useRef(wpm)
+  const wordsRef = useRef(words)
   useEffect(() => { indexRef.current = currentIndex }, [currentIndex])
+  useEffect(() => { wpmRef.current = wpm }, [wpm])
+  useEffect(() => { wordsRef.current = words }, [words])
   useEffect(() => {
     if (!isPlaying || words.length === 0) return
     let cancelled = false
-    const tick = (extraPause) => {
+    const schedule = () => {
       if (cancelled) return
       const idx = indexRef.current
-      if (idx >= words.length - 1) { setIsPlaying(false); return }
-      wpmSamplesRef.current.push(wpm)
-      if (rampSpeed > 0) setWpm(prev => Math.min(maxWpm, prev + rampSpeed * 0.05))
-      setCurrentIndex(idx + 1)
-      const baseDelay = (60 / wpm) * 1000
-      // Pause carries over to the next tick, so the punctuated word stays on screen longer
-      const nextPause = /[.!?]$/.test(words[idx]) ? baseDelay * 1.5 : /[,;:]$/.test(words[idx]) ? baseDelay * 0.4 : 0
-      intervalRef.current = setTimeout(() => tick(nextPause), baseDelay + (extraPause || 0))
+      const list = wordsRef.current
+      if (idx >= list.length) {
+        setIsPlaying(false)
+        return
+      }
+      let rate = wpmRef.current
+      wpmSamplesRef.current.push(rate)
+      if (rampSpeed > 0) {
+        const nextRate = Math.min(maxWpm, rate + rampSpeed * 0.05)
+        wpmRef.current = nextRate
+        setWpm(nextRate)
+        rate = nextRate
+      }
+      const wordMs = msForWpm(rate)
+      const w = list[idx] || ''
+      const sentenceEnd = /[.!?]$/.test(w)
+      const delayMs = wordMs + (sentenceEnd ? SENTENCE_PAUSE_MS : 0)
+      intervalRef.current = setTimeout(() => {
+        if (cancelled) return
+        const next = idx + 1
+        if (next >= list.length) {
+          setIsPlaying(false)
+          return
+        }
+        indexRef.current = next
+        setCurrentIndex(next)
+        schedule()
+      }, delayMs)
     }
-    intervalRef.current = setTimeout(() => tick(0), (60 / wpm) * 1000)
+    schedule()
     return () => { cancelled = true; clearTimeout(intervalRef.current) }
-  }, [isPlaying, wpm, words.length, rampSpeed, maxWpm])
+  }, [isPlaying, words.length, rampSpeed, maxWpm])
 
   // ── Recall interval checkpoint: watches currentIndex during playback ──
   useEffect(() => {
@@ -772,13 +1229,22 @@ export default function Home() {
     if (recallType === 'end') exitReader()
   }, [recallType, exitReader])
 
-  // Silent auto-save
+  const wordsLengthRef = useRef(0)
+  useEffect(() => { wordsLengthRef.current = words.length }, [words.length])
+
+  // Silent auto-save — refs avoid resetting the 10s interval on every word while reading
   useEffect(() => {
     if (user && isPro && currentDocId && showReader) {
-      const i = setInterval(async () => { await supabase.from('documents').update({ current_position: currentIndex, total_words: words.length, updated_at: new Date().toISOString() }).eq('id', currentDocId) }, 10000)
+      const i = setInterval(async () => {
+        await supabase.from('documents').update({
+          current_position: indexRef.current,
+          total_words: wordsLengthRef.current,
+          updated_at: new Date().toISOString(),
+        }).eq('id', currentDocId)
+      }, 10000)
       return () => clearInterval(i)
     }
-  }, [user, isPro, currentDocId, showReader, currentIndex, words.length])
+  }, [user, isPro, currentDocId, showReader, supabase])
 
   // Keyboard – guard inputs
   useEffect(() => {
@@ -798,71 +1264,36 @@ export default function Home() {
   }, [showReader, showThemePanel, togglePlay, words.length])
 
   // Components
+  const wordContainerRef = useRef(null)
+  const focalLetterRef = useRef(null)
+  const wordInnerRef = useRef(null)
+
+  // Runs after every render where the word changes — aligns focal letter to center
+  const lastWordRef = useRef('')
+  const currentWord = words[currentIndex] || ''
+  useLayoutEffect(() => {
+    if (!showReader) return
+    const container = wordContainerRef.current
+    const focal = focalLetterRef.current
+    const inner = wordInnerRef.current
+    if (!container || !focal || !inner) return
+    inner.style.transform = 'none'
+    const cr = container.getBoundingClientRect()
+    const fr = focal.getBoundingClientRect()
+    inner.style.transform = `translateX(${cr.left + cr.width * 0.5 - fr.left - fr.width / 2}px)`
+    lastWordRef.current = currentWord
+  }, [showReader, currentWord, fontSize, f.family, f.weight, f.ls, fc, t.text])
+
   const renderWord = (word) => {
     if (!word) return null
-    const orp = calculateORP(word); const bef = word.slice(0, orp); const foc = word[orp] || ''; const aft = word.slice(orp + 1)
+    const orp = calculateORP(word)
+    const bef = word.slice(0, orp), foc = word[orp] || '', aft = word.slice(orp + 1)
     return (
-      <div className={`${FSC[fontSize]} select-none`} style={{ fontFamily: f.family, fontWeight: f.weight, letterSpacing: f.ls, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
-        <span style={{ color: t.textMuted, textAlign: 'right' }}>{bef}</span>
-        <span className="font-semibold relative text-center px-[1px]" style={{ color: fc }}>{foc}<div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full" style={{ backgroundColor: fc, opacity: 0.4 }} /></span>
-        <span style={{ color: t.textMuted, textAlign: 'left' }}>{aft}</span>
-      </div>
-    )
-  }
-
-  const Slider = ({ value, min, max, step, onChange, label, format }) => {
-    const trackRef = useRef(null)
-    const [dragVal, setDragVal] = useState(null)
-    const isDragging = dragVal !== null
-    const display = isDragging ? dragVal : value
-    const pct = ((display - min) / (max - min)) * 100
-    const snap = (v) => Math.min(max, Math.max(min, Math.round((v - min) / step) * step + min))
-    const valFromX = useCallback((clientX) => {
-      const rect = trackRef.current.getBoundingClientRect()
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-      return min + ratio * (max - min)
-    }, [min, max])
-    useEffect(() => {
-      if (!isDragging) return
-      const onMove = (e) => {
-        const x = e.touches ? e.touches[0].clientX : e.clientX
-        setDragVal(snap(valFromX(x)))
-      }
-      const onUp = (e) => {
-        const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX
-        const final = snap(valFromX(x))
-        setDragVal(null)
-        onChange(final)
-      }
-      window.addEventListener('mousemove', onMove)
-      window.addEventListener('mouseup', onUp)
-      window.addEventListener('touchmove', onMove, { passive: false })
-      window.addEventListener('touchend', onUp)
-      return () => {
-        window.removeEventListener('mousemove', onMove)
-        window.removeEventListener('mouseup', onUp)
-        window.removeEventListener('touchmove', onMove)
-        window.removeEventListener('touchend', onUp)
-      }
-    }, [isDragging, min, max, step, valFromX, onChange])
-    const onStart = (e) => {
-      e.preventDefault()
-      const x = e.touches ? e.touches[0].clientX : e.clientX
-      const snapped = snap(valFromX(x))
-      setDragVal(snapped)
-      onChange(snapped)
-    }
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px]" style={{ color: t.textFaint }}>{label}</span>
-          <span className="text-[11px] font-semibold tabular-nums" style={{ color: t.accent }}>{format(display)}</span>
-        </div>
-        <div ref={trackRef} className="relative w-full h-8 flex items-center cursor-pointer select-none touch-none"
-          onMouseDown={onStart} onTouchStart={onStart}>
-          <div className="absolute inset-x-0 h-[5px] rounded-full" style={{ backgroundColor: t.border }} />
-          <div className="absolute left-0 h-[5px] rounded-full" style={{ width: `${pct}%`, backgroundColor: t.accent, opacity: 0.7 }} />
-          <div className="absolute h-5 w-5 rounded-full shadow-lg" style={{ left: `calc(${pct}% - 10px)`, backgroundColor: t.accent, boxShadow: `0 0 0 3px ${t.surface}, 0 2px 8px rgba(0,0,0,0.3)`, transform: isDragging ? 'scale(1.15)' : 'scale(1)', transition: isDragging ? 'transform 0.1s' : 'all 0.15s' }} />
+      <div ref={wordContainerRef} className={`${FSC[fontSize]} select-none`} style={{ fontFamily: f.family, fontWeight: f.weight, letterSpacing: f.ls, overflow: 'visible' }}>
+        <div ref={wordInnerRef} style={{ whiteSpace: 'nowrap', width: 'fit-content' }}>
+          <span style={{ color: t.text }}>{bef}</span>
+          <span ref={focalLetterRef} style={{ color: fc }}>{foc}</span>
+          <span style={{ color: t.text }}>{aft}</span>
         </div>
       </div>
     )
@@ -974,8 +1405,12 @@ export default function Home() {
         {showThemePanel && <ThemePanel />}
         {/* Word – tap to play */}
         <div className="flex-1 flex items-center justify-center relative px-4 md:px-8 cursor-pointer" onClick={() => { if (!showRecall) togglePlay() }}>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-px h-24" style={{ background: `linear-gradient(transparent, ${t.border}50, transparent)` }} />
           <div className="relative z-10 w-[90vw] max-w-[700px] py-14">
+            {/* Focal guide lines at center */}
+            <div className="absolute pointer-events-none" style={{ left: '50%', top: 0, bottom: 0, transform: 'translateX(-50%)' }}>
+              <div className="absolute w-px" style={{ top: 0, height: '20%', background: `linear-gradient(transparent, ${t.accent}50)` }} />
+              <div className="absolute w-px" style={{ bottom: 0, height: '20%', background: `linear-gradient(${t.accent}50, transparent)` }} />
+            </div>
             {renderWord(words[currentIndex])}
             {!isPlaying && currentIndex === 0 && <div className="text-center mt-6 text-[11px]" style={{ color: t.textFaint, opacity: 0.5 }}>tap to start</div>}
           </div>
@@ -1019,6 +1454,7 @@ export default function Home() {
     <main className="min-h-screen" style={{ backgroundColor: t.bg, color: t.text, fontFamily: MAIN_FONT }}>
       <Toast toasts={toasts} removeToast={removeToast} theme={t} />
       <ConfirmModal isOpen={confirmModal.isOpen} title="Delete Document" message={`Are you sure you want to delete "${confirmModal.docTitle}"? This cannot be undone.`} onConfirm={confirmDelete} onCancel={cancelDelete} confirmLabel="Delete" theme={t} />
+      <CameraModal isOpen={showCamera} onClose={() => setShowCamera(false)} theme={t} onPhoto={handleCameraPhoto} onError={handleCameraError} />
       <div className="fixed inset-0 pointer-events-none overflow-hidden"><div className="absolute -top-40 left-1/3 w-[600px] h-[600px] rounded-full blur-[150px]" style={{ backgroundColor: t.accentGlow }} /></div>
       <div className="relative max-w-5xl mx-auto px-4 md:px-6 lg:px-10 py-6 md:py-8">
         {/* Header */}
@@ -1052,14 +1488,25 @@ export default function Home() {
           <div>
             <h3 className="text-[12px] font-semibold tracking-wide mb-2.5" style={{ color: t.textFaint }}>Upload</h3>
             <div className="relative">
-              <input type="file" accept=".pdf,.docx,.txt" onChange={handleFileUpload} className="hidden" id="fileInput" />
+              <input type="file" accept=".pdf,.docx,.txt,image/png,image/jpeg,image/jpg,image/webp,image/gif" onChange={handleFileUpload} className="hidden" id="fileInput" />
               <label htmlFor="fileInput" className="group block border border-dashed rounded-xl p-7 md:p-9 text-center cursor-pointer transition-all duration-200 hover:opacity-80" style={{ borderColor: t.border }}>
                 <div className="flex flex-col items-center gap-2.5">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: t.surfaceHover }}><svg className="w-5 h-5" style={{ color: t.textFaint }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg></div>
-                  <div><div className="text-[13px] font-medium mb-0.5" style={{ color: t.textMuted }}>Drop a file here</div><div className="text-[11px]" style={{ color: t.textFaint }}>{isPro ? 'PDF, DOCX, TXT · Max 10MB' : 'TXT · Upgrade for PDF & DOCX'}</div></div>
+                  <div><div className="text-[13px] font-medium mb-0.5" style={{ color: t.textMuted }}>Drop a file here</div><div className="text-[11px]" style={{ color: t.textFaint }}>{isPro ? 'PDF, DOCX, screenshots (OCR), TXT · Max 10MB' : 'TXT · Upgrade for PDF, DOCX & screenshot OCR'}</div></div>
                 </div>
                 {uploadProgress > 0 && <div className="absolute inset-0 backdrop-blur-sm rounded-xl flex items-center justify-center" style={{ backgroundColor: t.bg + 'ee' }}><div className="text-center"><div className="text-xl font-light tabular-nums mb-1" style={{ color: t.accent }}>{uploadProgress}%</div><div className="text-[11px]" style={{ color: t.textFaint }}>{uploadProgress === 100 && showUploadSuccess ? 'Done' : 'Processing'}</div></div></div>}
               </label>
+            </div>
+            <div className="mt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={openCamera}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-[12px] font-medium transition-all hover:opacity-90"
+                style={{ backgroundColor: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                {isPro ? 'Use camera' : 'Camera · Pro'}
+              </button>
             </div>
             {/* URL import */}
             <div className="mt-2.5 flex gap-2">
@@ -1116,7 +1563,7 @@ export default function Home() {
                 { label: 'Font size', format: (v) => FSL[v], min: 1, max: 6, step: 1, v: fontSize, fn: setFontSize },
                 { label: 'Recall every', format: (v) => v === 0 ? 'Off' : `${v} words`, min: 0, max: 500, step: 50, v: recallInterval, fn: setRecallInterval },
               ].map((c, i) => (
-                <Slider key={i} value={c.v} min={c.min} max={c.max} step={c.step} onChange={c.fn} label={c.label} format={c.format} />
+                <Slider key={i} value={c.v} min={c.min} max={c.max} step={c.step} onChange={c.fn} label={c.label} format={c.format} theme={t} />
               ))}
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${t.border}` }}>
@@ -1188,9 +1635,9 @@ export default function Home() {
             <button onClick={() => setShowUpgradeModal(false)} className="absolute top-3.5 right-3.5 w-6 h-6 rounded flex items-center justify-center hover:opacity-70" style={{ color: t.textFaint }}><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg></button>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ backgroundColor: t.accentGlow, border: `1px solid ${t.accent}20` }}><svg className="w-5 h-5" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div>
             <h3 className="text-lg font-semibold tracking-tight mb-1" style={{ color: t.text }}>Upgrade to <span style={{ color: t.accent }}>Pro</span></h3>
-            <p className="text-[13px] leading-relaxed mb-4" style={{ color: t.textMuted }}>{upgradeReason === 'pdf' ? 'PDF & DOCX uploads require Pro.' : upgradeReason === 'url' ? 'URL import requires Pro.' : upgradeReason === 'wordcount' ? 'Free is limited to 5,000 words.' : 'Get the full experience.'}</p>
+            <p className="text-[13px] leading-relaxed mb-4" style={{ color: t.textMuted }}>{upgradeReason === 'pdf' ? 'PDF & DOCX uploads require Pro.' : upgradeReason === 'image' ? 'Screenshot & image text (OCR) require Pro — perfect for online textbooks without a PDF.' : upgradeReason === 'url' ? 'URL import requires Pro.' : upgradeReason === 'wordcount' ? 'Free is limited to 5,000 words.' : 'Get the full experience.'}</p>
             <div className="rounded-lg p-3.5 mb-4" style={{ backgroundColor: t.bg, border: `1px solid ${t.border}` }}>
-              <div className="space-y-1.5">{['PDF & DOCX uploads', 'URL import', 'Unlimited words', 'Cloud library', 'Auto-save & analytics'].map((x, i) => (<div key={i} className="flex items-center gap-2 text-[12px]"><svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg><span style={{ color: t.text }}>{x}</span></div>))}</div>
+              <div className="space-y-1.5">{['PDF & DOCX uploads', 'Camera or screenshot OCR', 'URL import', 'Unlimited words', 'Cloud library', 'Auto-save & analytics'].map((x, i) => (<div key={i} className="flex items-center gap-2 text-[12px]"><svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: t.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg><span style={{ color: t.text }}>{x}</span></div>))}</div>
             </div>
             <div className="flex gap-2 mb-3">
               <button onClick={() => handleUpgrade('monthly')} className="flex-1 py-2.5 rounded-xl font-semibold text-[13px] shadow-lg transition-all hover:opacity-90" style={{ backgroundColor: t.accent, color: t.btnText }}>

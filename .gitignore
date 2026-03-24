@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# tesseract.js downloads trained data locally when running OCR
+*.traineddata
+
 # debug
 npm-debug.log*
 yarn-debug.log*

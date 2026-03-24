@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 
+const RSVP_DEMO_WORDS = "The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years.".split(' ')
+
 // ——— RSVP Demo ————————————————————————
 function RSVPDemo() {
-  const text = "The ancient library stood silent in the moonlight. Sarah pushed open the heavy oak door and stepped inside. Dust particles floated through beams of silver light streaming from tall windows. She had been searching for this place for three years."
-  const words = text.split(' ')
+  const words = RSVP_DEMO_WORDS
   const [idx, setIdx] = useState(0)
   const [speed, setSpeed] = useState(350)
 
@@ -53,13 +54,23 @@ function RSVPDemo() {
 // ——— Animated Counter ——————————————————
 function Counter({ target, suffix = '' }) {
   const [n, setN] = useState(0)
-  const [go, setGo] = useState(false)
+  const startedRef = useRef(false)
   const ref = useRef(null)
   useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting && !go) { setGo(true); const s = Date.now(); const a = () => { const p = Math.min((Date.now() - s) / 1800, 1); setN(Math.floor((1 - Math.pow(1 - p, 3)) * target)); if (p < 1) requestAnimationFrame(a) }; requestAnimationFrame(a) } }, { threshold: 0.5 })
+    const obs = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting || startedRef.current) return
+      startedRef.current = true
+      const s = Date.now()
+      const a = () => {
+        const p = Math.min((Date.now() - s) / 1800, 1)
+        setN(Math.floor((1 - Math.pow(1 - p, 3)) * target))
+        if (p < 1) requestAnimationFrame(a)
+      }
+      requestAnimationFrame(a)
+    }, { threshold: 0.5 })
     if (ref.current) obs.observe(ref.current)
     return () => obs.disconnect()
-  }, [target, go])
+  }, [target])
   return <span ref={ref}>{n}{suffix}</span>
 }
 
@@ -69,7 +80,21 @@ function Counter({ target, suffix = '' }) {
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0)
   const [mobileMenu, setMobileMenu] = useState(false)
-  useEffect(() => { const h = () => setScrollY(window.scrollY); window.addEventListener('scroll', h, { passive: true }); return () => window.removeEventListener('scroll', h) }, [])
+  const scrollRafRef = useRef(0)
+  useEffect(() => {
+    const h = () => {
+      if (scrollRafRef.current) return
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = 0
+        setScrollY(window.scrollY)
+      })
+    }
+    window.addEventListener('scroll', h, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', h)
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+    }
+  }, [])
 
   const font = '"SF Pro Display", -apple-system, system-ui, sans-serif'
 

@@ -45,7 +45,8 @@ export async function POST(request) {
       .replace(/\s+/g, ' ')           // collapse whitespace
       .trim()
 
-    if (!plainText || plainText.split(/\s+/).length < 10) {
+    const wordCount = plainText ? plainText.trim().split(/\s+/).filter(Boolean).length : 0
+    if (!plainText || wordCount < 10) {
       return NextResponse.json(
         { error: 'Page had too little readable content. Try a different URL.' },
         { status: 422 }
@@ -55,7 +56,7 @@ export async function POST(request) {
     return NextResponse.json({
       text: plainText,
       title: article.title || parsed.hostname,
-      wordCount: plainText.split(/\s+/).length,
+      wordCount,
       source: parsed.hostname,
     })
   } catch (err) {
